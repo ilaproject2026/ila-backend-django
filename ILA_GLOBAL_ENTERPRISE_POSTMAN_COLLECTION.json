@@ -1,0 +1,1132 @@
+{
+  "info": {
+    "_postman_id": "ila-global-enterprise-v3-api-collection",
+    "name": "ILA Global Enterprise Platform (2_ILA_WEB_v3.3)",
+    "description": "Complete REST API Collection for ILA Global Enterprise Portal, CRM, ERP, and LMS Educational Platform.\nTarget Stack: Django 6.1 REST Framework + PostgreSQL/SQLite + Gemini 2.5 Flash AI.\n\nPre-requisite: Run `python manage.py runserver` at http://127.0.0.1:8000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gate_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication & Security Gate",
+      "item": [
+        {
+          "name": "Login (Obtain JWT & Profile)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    console.log('Access token saved to collection variable.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", ""]
+            },
+            "description": "Authenticates user and returns JWT access + refresh tokens and full user profile with roles."
+          }
+        },
+        {
+          "name": "Verify Security Gate PIN (7890 / ILA2026)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.elevated_token) {",
+                  "    pm.collectionVariables.set('gate_token', jsonData.elevated_token);",
+                  "    console.log('Gate token saved to collection variable.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"7890\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/verify-security-gate/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "verify-security-gate", ""]
+            },
+            "description": "Validates Level 1 Edit PIN ('7890' or 'ILA2026') and returns elevated security token valid for 15 minutes."
+          }
+        },
+        {
+          "name": "Get Current User Profile (/auth/me/)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me", ""]
+            },
+            "description": "Returns current authenticated user details, department, roles, and verification status."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"<PASTE_REFRESH_TOKEN_HERE>\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/token/refresh/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "token", "refresh", ""]
+            }
+          }
+        },
+        {
+          "name": "Register New Student / Lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john.doe@example.com\",\n  \"phone\": \"+4917612345678\",\n  \"password\": \"Password@123\",\n  \"fullname\": \"John Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register", ""]
+            }
+          }
+        },
+        {
+          "name": "Verify Registration OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"john.doe@example.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/verify-otp/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "verify-otp", ""]
+            }
+          }
+        },
+        {
+          "name": "Check Login Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/check-login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "check-login", ""]
+            }
+          }
+        },
+        {
+          "name": "List Franchise Partners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/franchise/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "franchise", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Franchise Partner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"FRANCHISE-MUC-101\",\n  \"name\": \"ILA Bavaria Regional Partner\",\n  \"email\": \"munich@ilaglobal.de\",\n  \"region\": \"Munich, Germany\",\n  \"partner_token\": \"TOK-MUC-88492\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/franchise/create/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "franchise", "create", ""]
+            }
+          }
+        },
+        {
+          "name": "View System Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/audit-logs/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "audit-logs", ""]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Front-Office & CRM Inquiries",
+      "item": [
+        {
+          "name": "List All Inquiries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/?lead_type=Walk-in&category=Education",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", ""],
+              "query": [
+                {
+                  "key": "lead_type",
+                  "value": "Walk-in"
+                },
+                {
+                  "key": "category",
+                  "value": "Education"
+                },
+                {
+                  "key": "crm_status",
+                  "value": "New Lead",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "Sharma",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists all CRM inquiries with nested follow-up history, supporting filters by lead_type, category, crm_status, pipeline_stage, visa_stage, and search."
+          }
+        },
+        {
+          "name": "Daily Intake & Revenue Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/stats/daily/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", "stats", "daily", ""]
+            },
+            "description": "Returns real-time aggregated metrics: today's walk-ins, online leads, conversions, overdue follow-up calls, and collected revenue."
+          }
+        },
+        {
+          "name": "Create Walk-in / Online Inquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lead_type\": \"Walk-in\",\n  \"name\": \"Felix Schmidt\",\n  \"email\": \"felix.schmidt@gmail.com\",\n  \"phone\": \"+49 152 98765432\",\n  \"category\": \"Visa\",\n  \"course_name\": \"German Opportunity Card (Chancenkarte) Accelerator\",\n  \"total_amount\": \"1200.00\",\n  \"amount_paid\": \"0.00\",\n  \"visitor_purpose\": \"Chancenkarte eligibility consultation\",\n  \"receptionist_name\": \"Meera Kapoor\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", ""]
+            },
+            "description": "Auto-generates sequential token (e.g. ILA-WALK-104) and initializes CRM pipeline."
+          }
+        },
+        {
+          "name": "Get Inquiry Details by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/inq-101/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", "inq-101", ""]
+            }
+          }
+        },
+        {
+          "name": "Add Follow-up Record & Reschedule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"Phone Call\",\n  \"notes\": \"Followed up regarding APS document verification. Candidate promised to send transcripts by Friday.\",\n  \"outcome\": \"Docs Pending\",\n  \"next_follow_up_date\": \"2026-09-12\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/inq-101/followup/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", "inq-101", "followup", ""]
+            }
+          }
+        },
+        {
+          "name": "Process Installment Payment (Auto-Sync to Ledger)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"400.00\",\n  \"payment_status\": \"Partially Paid\",\n  \"notes\": \"Second installment via Bank Transfer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/inq-102/payment/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", "inq-102", "payment", ""]
+            },
+            "description": "Records fee payment and automatically writes an Income entry to the double-entry Financial Ledger."
+          }
+        },
+        {
+          "name": "Assign Staff Counselor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staff_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/inquiries/inq-101/assign-staff/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "inquiries", "inq-101", "assign-staff", ""]
+            }
+          }
+        },
+        {
+          "name": "Log Visitor Pageview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": \"/courses/german-a1-b2\",\n  \"time_spent_seconds\": 45\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/frontoffice/visitor-log/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "frontoffice", "visitor-log", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Academics & Course Creator",
+      "item": [
+        {
+          "name": "List Global Categories & Subcategories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/categories/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "categories", ""]
+            }
+          }
+        },
+        {
+          "name": "List Teaching Strategies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/strategies/teaching/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "strategies", "teaching", ""]
+            }
+          }
+        },
+        {
+          "name": "List Student Analyzing Strategies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/strategies/analyzing/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "strategies", "analyzing", ""]
+            }
+          }
+        },
+        {
+          "name": "List All Courses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/courses/?library_type=TUTOR",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "courses", ""],
+              "query": [
+                {
+                  "key": "library_type",
+                  "value": "TUTOR"
+                },
+                {
+                  "key": "category",
+                  "value": "cat-1",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"4\",\n  \"name\": \"Full-Stack Cloud & Python Architecture\",\n  \"top_title\": \"Software Engineering\",\n  \"subtitle\": \"AWS, Django REST, React 19\",\n  \"category\": \"cat-5\",\n  \"fee\": \"1800.00\",\n  \"chapters_count\": 32,\n  \"duration\": \"4 Months\",\n  \"library_type\": \"TUTOR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/courses/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "courses", ""]
+            }
+          }
+        },
+        {
+          "name": "List Dynamic Paths (by Course)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/paths/?course=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "paths", ""],
+              "query": [
+                {
+                  "key": "course",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Cohort Batches (by Course)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/batches/?course=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "batches", ""],
+              "query": [
+                {
+                  "key": "course",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course\": \"1\",\n  \"name\": \"Evening Goethe Sprint 2026\",\n  \"code\": \"BAT-DE-EVE\",\n  \"timings\": [\"18:00 - 20:30 CET\"],\n  \"starting_date\": \"2026-10-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/batches/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "batches", ""]
+            }
+          }
+        },
+        {
+          "name": "Get Timetable Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/timetable/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "timetable", ""]
+            }
+          }
+        },
+        {
+          "name": "Schedule Studio Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-09-10\",\n  \"course\": \"1\",\n  \"instructor\": \"Klaus Mueller\",\n  \"time_slot\": \"09:00 - 11:30 CET\",\n  \"start_time\": \"09:00\",\n  \"end_time\": \"11:30\",\n  \"status\": \"Upcoming\",\n  \"room\": \"Studio Berlin\",\n  \"topic\": \"Dative Prepositions in Medical Dialogue\",\n  \"meeting_link\": \"https://meet.ilaglobal.de/de-a1\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/academics/timetable/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "academics", "timetable", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. HRMS & Staff Hub",
+      "item": [
+        {
+          "name": "List Staff Profiles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/staff/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "staff", ""]
+            }
+          }
+        },
+        {
+          "name": "Staff Attendance Log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/attendance/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "attendance", ""]
+            }
+          }
+        },
+        {
+          "name": "Staff Check-in / Check-out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": \"STAFF-001\",\n  \"status\": \"Present\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/attendance/check-in/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "attendance", "check-in", ""]
+            }
+          }
+        },
+        {
+          "name": "List Recruitment Candidates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/candidates/?stage=Hiring%20%26%20Interview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "candidates", ""],
+              "query": [
+                {
+                  "key": "stage",
+                  "value": "Hiring & Interview"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Job Candidate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sarah Jenkins\",\n  \"email\": \"sarah.j@example.com\",\n  \"phone\": \"+49 176 55566677\",\n  \"position\": \"German Language Instructor C1\",\n  \"department\": \"Academic\",\n  \"expected_salary\": \"4200.00\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/candidates/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "candidates", ""]
+            }
+          }
+        },
+        {
+          "name": "Progress Candidate Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"Pending Department Approval\",\n  \"status\": \"Approved\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/candidates/<CAND_ID>/stage/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "candidates", "<CAND_ID>", "stage", ""]
+            }
+          }
+        },
+        {
+          "name": "Sync Monthly Payroll to Financial Ledger",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/payroll/sync-finance/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "payroll", "sync-finance", ""]
+            },
+            "description": "Calculates active staff salary totals and registers an Expense entry in the Financial Ledger."
+          }
+        },
+        {
+          "name": "List Enterprise Tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "tasks", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Enterprise Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Audit APS Documentation for Winter 2026 Intake\",\n  \"description\": \"Verify certified translations and blocked account balance before embassy appointments.\",\n  \"assigned_to_dept\": \"Study Abroad\",\n  \"priority\": \"High\",\n  \"status\": \"In Progress\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "tasks", ""]
+            }
+          }
+        },
+        {
+          "name": "List Executive Approvals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hrms/approvals/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hrms", "approvals", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Finance & Accounts Hub",
+      "item": [
+        {
+          "name": "List Double-Entry Ledger",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/ledger/?type=income",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "ledger", ""],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "income"
+                },
+                {
+                  "key": "category",
+                  "value": "Education",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Manual Ledger Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_type\": \"expense\",\n  \"category\": \"IT & Server Infrastructure\",\n  \"description\": \"Frankfurt Dedicated Cloud Cluster monthly hosting\",\n  \"amount\": \"250.00\",\n  \"reference_id\": \"INV-AWS-202609\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/ledger/entry/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "ledger", "entry", ""]
+            }
+          }
+        },
+        {
+          "name": "List Sales Installment Records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/sales/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "sales", ""]
+            }
+          }
+        },
+        {
+          "name": "List Fund Pools",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/funds/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "funds", ""]
+            }
+          }
+        },
+        {
+          "name": "List Consultant Commissions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/commissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "commissions", ""]
+            }
+          }
+        },
+        {
+          "name": "Approve Commission & Payout to Ledger",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/finance/commissions/<COMM_ID>/pay/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "finance", "commissions", "<COMM_ID>", "pay", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Rewards & Referrals Hub",
+      "item": [
+        {
+          "name": "List Referrals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/rewards/referrals/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rewards", "referrals", ""]
+            }
+          }
+        },
+        {
+          "name": "Submit Referral Lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"referrer_name\": \"Klaus Mueller\",\n  \"referrer_email\": \"klaus@ilaglobal.de\",\n  \"referrer_role\": \"Employee\",\n  \"candidate_name\": \"Markus Bauer\",\n  \"vertical\": \"Education Hub\",\n  \"commission_amount\": \"150.00\",\n  \"points_earned\": 25\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/rewards/referrals/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rewards", "referrals", ""]
+            }
+          }
+        },
+        {
+          "name": "Approve Referral (Marketing/Accounts/Payout)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"payout\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/rewards/referrals/<REF_ID>/approve/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rewards", "referrals", "<REF_ID>", "approve", ""]
+            }
+          }
+        },
+        {
+          "name": "List Loyalty Tier Matrix",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/rewards/matrix/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rewards", "matrix", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. AI Engine (Gemini 2.5 Flash)",
+      "item": [
+        {
+          "name": "AI Course Creator (Generate Syllabus)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_name\": \"German for Doctors: Fachsprachprüfung (FSP) C1\",\n  \"category\": \"Healthcare German\",\n  \"target_audience\": \"Foreign Medical Doctors & Specialists\",\n  \"duration\": \"4 Months\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ai/course-creator/generate/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ai", "course-creator", "generate", ""]
+            },
+            "description": "Generates a complete accredited syllabus breakdown, modules, and teaching strategy drills via Gemini Flash."
+          }
+        },
+        {
+          "name": "AI German Chancenkarte / Visa Eligibility Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"candidate_name\": \"Aarav Mehta\",\n  \"age\": 28,\n  \"education\": \"Master of Science in Mechanical Engineering\",\n  \"german_level\": \"B1 Goethe Zertifikat\",\n  \"english_level\": \"IELTS 7.5\",\n  \"work_experience_years\": 4,\n  \"previous_germany_stay\": \"No\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ai/eligibility-check/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ai", "eligibility-check", ""]
+            },
+            "description": "Calculates candidate Chancenkarte opportunity points, admission suitability, and step-by-step roadmap."
+          }
+        },
+        {
+          "name": "Intelli-Coach AI Classroom Tutor Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Can you explain the difference between 'weil' and 'denn' with medical workplace examples?\",\n  \"course_context\": \"German Language CEFR A1-B2 Intensive\",\n  \"history\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ai/classroom/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ai", "classroom", "chat", ""]
+            },
+            "description": "Intelli-Coach AI student query tutor for real-time doubt resolution."
+          }
+        },
+        {
+          "name": "AI Candidate Resume Parser & Character Analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume_text\": \"DR. RAHUL MENON, MD. 6 years experience in General Surgery. Completed MBBS at AIIMS Delhi. B2 Goethe Certified in German. Seeking Assistenzarzt position in North Rhine-Westphalia hospitals.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ai/candidate/parse-resume/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ai", "candidate", "parse-resume", ""]
+            },
+            "description": "Parses raw CV text to extract candidate experience, skills, suitability score, and character analysis."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. OpenAPI & Swagger Docs",
+      "item": [
+        {
+          "name": "OpenAPI 3.0 JSON Schema",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/schema/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "schema", ""]
+            }
+          }
+        },
+        {
+          "name": "Swagger UI HTML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/docs/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "docs", ""]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

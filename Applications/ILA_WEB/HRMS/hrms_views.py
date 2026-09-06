@@ -141,7 +141,7 @@ class PayrollSyncView(APIView):
         ref_id = f"PAYROLL-{now.strftime('%Y%m')}"
 
         try:
-            from Applications.Finance.finance_models import FinancialLedger
+            from Applications.ILA_WEB.Finance.finance_models import FinancialLedger
             entry, created = FinancialLedger.objects.get_or_create(
                 reference_id=ref_id,
                 defaults={

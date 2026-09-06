@@ -109,7 +109,7 @@ class InquiryViewSet(viewsets.ModelViewSet):
 
             # Auto-sync to Financial Ledger
             try:
-                from Applications.Finance.finance_models import FinancialLedger
+                from Applications.ILA_WEB.Finance.finance_models import FinancialLedger
                 FinancialLedger.objects.create(
                     transaction_type='income',
                     category='Education Revenue',

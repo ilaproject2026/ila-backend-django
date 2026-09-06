@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'Applications',
+    'Applications.ILA_WEB',
     'drf_spectacular',
 ]
 

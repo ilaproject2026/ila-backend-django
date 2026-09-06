@@ -56,7 +56,7 @@ class SalesRecord(models.Model):
 
     id = models.CharField(max_length=50, primary_key=True, default=generate_sales_id)
     client_name = models.CharField(max_length=255)
-    inquiry = models.ForeignKey('Applications.Inquiry', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales_records')
+    inquiry = models.ForeignKey('ILA_WEB.Inquiry', on_delete=models.SET_NULL, null=True, blank=True, related_name='sales_records')
     program_name = models.CharField(max_length=255)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)

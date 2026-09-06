@@ -35,7 +35,7 @@ class ReferralRecordViewSet(viewsets.ModelViewSet):
             ref.status = 'Paid Out'
             # Record expense in Financial Ledger
             try:
-                from Applications.Finance.finance_models import FinancialLedger
+                from Applications.ILA_WEB.Finance.finance_models import FinancialLedger
                 FinancialLedger.objects.create(
                     transaction_type='expense',
                     category='Referral Payout',

@@ -5,8 +5,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 from Applications.Authentication.auth_models import FranchisePartner, AuditLog
-from Applications.FrontOffice.frontoffice_models import Inquiry, FollowUpRecord
-from Applications.Academics.academics_models import (
+from Applications.ILA_WEB.FrontOffice.frontoffice_models import Inquiry, FollowUpRecord
+from Applications.ILA_WEB.Academics.academics_models import (
     GlobalCategory,
     GlobalSubCategory,
     TeachingStrategy,
@@ -16,9 +16,9 @@ from Applications.Academics.academics_models import (
     GlobalBatch,
     ClassScheduleSession,
 )
-from Applications.HRMS.hrms_models import StaffProfile, HRCandidate, EnterpriseTask, ApprovalRequest
-from Applications.Finance.finance_models import FinancialLedger, SalesRecord, FundPool, CommissionItem
-from Applications.Rewards.rewards_models import ReferralRecord, TierRule
+from Applications.ILA_WEB.HRMS.hrms_models import StaffProfile, HRCandidate, EnterpriseTask, ApprovalRequest
+from Applications.ILA_WEB.Finance.finance_models import FinancialLedger, SalesRecord, FundPool, CommissionItem
+from Applications.ILA_WEB.Rewards.rewards_models import ReferralRecord, TierRule
 
 User = get_user_model()
 
