@@ -1,0 +1,436 @@
+{
+  "info": {
+    "_postman_id": "nexus-b2b-trade-api-collection-v1",
+    "name": "NEXUS B2B Global Trade & Logistics Platform",
+    "description": "Production REST API Collection for NEXUS B2B Global Import-Export, Logistics & Escrow Operating System.\n\nStack: Django 6.1 REST Framework + PostgreSQL/SQLite.\nBase URL default: http://127.0.0.1:8000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "approval_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Authentication",
+      "item": [
+        {
+          "name": "Login (Obtain Admin Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    console.log('access_token saved to collection variables.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Portal & Intelligence",
+      "item": [
+        {
+          "name": "Get Portal KPI Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/portal/metrics/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "portal", "metrics", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Trade Intelligence Articles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/portal/articles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "portal", "articles", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Live Supply Demands",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/portal/demands/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "portal", "demands", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Importers & Verified Buyers",
+      "item": [
+        {
+          "name": "List Importers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/importers/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "importers", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "AI Deep Research Dossier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Nordic Agro-Logistics AB\",\n  \"country\": \"Sweden\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/importers/deep-research/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "importers", "deep-research", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Exporters & Certified Producers",
+      "item": [
+        {
+          "name": "List Exporters",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/exporters/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "exporters", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. RFQs & Public Tenders",
+      "item": [
+        {
+          "name": "List RFQ Tenders",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/rfqs/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rfqs", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Public Tender",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"High-Grade Automotive Silicon Carbide Wafers\",\n  \"hsCode\": \"2849.20.00\",\n  \"targetQuantity\": \"20,000 Wafers\",\n  \"targetBudgetUsd\": 5000000.00,\n  \"incoterm\": \"CIF Singapore\",\n  \"deliveryDeadline\": \"30 Days from Escrow Lock\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/rfqs/public-tender/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rfqs", "public-tender", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Transactions & Smart Escrow Vaults",
+      "item": [
+        {
+          "name": "List Consignments & Escrows",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var results = jsonData.results || jsonData;",
+                  "if (results.length > 0) {",
+                  "    pm.collectionVariables.set('transaction_id', results[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/transactions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "transactions", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Advance Milestone Stage",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/transactions/{{transaction_id}}/advance-milestone/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "transactions", "{{transaction_id}}", "advance-milestone", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Multi-Sig Escrow Vault",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signerRole\": \"CEO\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/transactions/{{transaction_id}}/sign-vault/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "transactions", "{{transaction_id}}", "sign-vault", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. CEO Executive Approvals Desk",
+      "item": [
+        {
+          "name": "List Pending Approvals",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "var results = jsonData.results || jsonData;",
+                  "if (results.length > 0) {",
+                  "    pm.collectionVariables.set('approval_id', results[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ceo/approvals/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ceo", "approvals", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Authorize Single Deal",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ceo/approvals/{{approval_id}}/approve/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ceo", "approvals", "{{approval_id}}", "approve", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Authorize All Deals",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ceo/approvals/bulk-approve/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ceo", "approvals", "bulk-approve", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Sanctions & Compliance Radar",
+      "item": [
+        {
+          "name": "List Sanctions Logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/compliance/sanctions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "compliance", "sanctions", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Screen Entity Instantly",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityName\": \"Global Maritime Logistics Oy\",\n  \"country\": \"Finland\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/compliance/sanctions/screen/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "compliance", "sanctions", "screen", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. HR & Treasury",
+      "item": [
+        {
+          "name": "List Global Staff",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hr/staff/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hr", "staff", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Payroll Disbursement",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/hr/staff/payroll/disburse/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hr", "staff", "payroll", "disburse", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Treasury Reserves",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounts/treasury/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "accounts", "treasury", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Treasury Ledger",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounts/ledger/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "accounts", "ledger", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Strategic Tieups & MoUs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/tieups/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tieups", ""]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

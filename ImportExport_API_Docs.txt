@@ -1,0 +1,778 @@
+================================================================================
+  NEXUS B2B GLOBAL TRADE & LOGISTICS PLATFORM — API DOCUMENTATION
+  Application: Applications.ImportExport
+  Base URL: /api/v1/import-export/
+================================================================================
+
+Generated: 2026-09-08
+Django REST Framework Backend — AllowAny (Public) Endpoints
+All endpoints return JSON. UUID primary keys. Pagination via DRF defaults.
+
+================================================================================
+  TABLE OF CONTENTS
+================================================================================
+
+  1.  Importers (Verified Buyers)
+  2.  Exporters (Certified Producers)
+  3.  RFQ Tenders (Request for Quotation)
+  4.  Consignment Transactions & Smart Escrow
+  5.  CEO Executive Approvals Desk
+  6.  Compliance & Sanctions Radar
+  7.  HR Staff Management
+  8.  HR Job Vacancies
+  9.  Accounts Ledger
+  10. Treasury Reserves
+  11. Strategic Tie-ups (MoU)
+  12. Portal Articles
+  13. Portal Demands
+  14. Portal Platform Metrics (KPI Dashboard)
+
+================================================================================
+  1. IMPORTERS (VERIFIED BUYERS)
+================================================================================
+
+Base Path: /api/v1/import-export/importers/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/importers/
+
+  Query Parameters (Filters):
+    ?country=Germany           — Filter by country
+    ?tier=Verified Gold        — Filter by tier (Verified Gold, Verified Silver, Standard Buyer)
+    ?status=Active Buyer       — Filter by status
+
+  Search (case-insensitive partial match):
+    ?search=Siemens            — Searches: name, reference_id, contact_person, port_of_destination
+
+  Ordering:
+    ?ordering=created_at       — Order by: created_at, annual_volume_usd, name
+    ?ordering=-name            — Prefix with '-' for descending
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "IMP-1048",
+    "name": "Siemens AG Industrial Procurement",
+    "country": "Germany",
+    "flag": "🇩🇪",
+    "tier": "Verified Gold",
+    "rating": "4.9 ★",
+    "annualVolumeUsd": "25000000.00",
+    "portOfDestination": "Port of Hamburg",
+    "categories": ["Industrial Machinery", "Semiconductors"],
+    "activeRfqs": 3,
+    "contactPerson": "Director of Procurement",
+    "contactEmail": "procurement@siemens.de",
+    "creditScore": "AAA (Clean)",
+    "status": "Active Buyer",
+    "lastActive": "Verified Just Now",
+    "established": 1847,
+    "employees": "100+",
+    "taxId": "DE123456789",
+    "bankPartner": "Deutsche Bank AG",
+    "escrowDepositCapacity": "25000000.00",
+    "auditStatus": "KYC Verified (Sanctions Cleared)",
+    "preferredIncoterms": ["CIF", "FOB"],
+    "historicalTradesCount": 12,
+    "rfqTenders": [ ... nested RFQ objects ... ]
+  }
+
+RETRIEVE
+────────
+  GET /api/v1/import-export/importers/{id}/
+
+CREATE
+──────
+  POST /api/v1/import-export/importers/
+
+  Request Body:
+  {
+    "reference_id": "IMP-1050",
+    "name": "New Buyer Corp",
+    "country": "Singapore",
+    "flag": "🇸🇬",
+    "tier": "Verified Gold",
+    "portOfDestination": "Port of Singapore",
+    "categories": ["Electronics"],
+    "contactPerson": "Jane Doe",
+    "contactEmail": "jane@buyer.sg",
+    "bankPartner": "DBS Bank"
+  }
+
+UPDATE / PARTIAL UPDATE
+───────────────────────
+  PUT   /api/v1/import-export/importers/{id}/     (full update)
+  PATCH /api/v1/import-export/importers/{id}/     (partial update)
+
+DELETE
+──────
+  DELETE /api/v1/import-export/importers/{id}/
+
+CUSTOM ACTION: Deep Research
+────────────────────────────
+  POST /api/v1/import-export/importers/deep-research/
+
+  Request Body:
+  {
+    "companyName": "Siemens AG",
+    "country": "Germany"
+  }
+
+  Response:
+  {
+    "companyName": "Siemens AG",
+    "country": "Germany",
+    "creditScore": "AAA (D&B Verified 98/100)",
+    "sanctionsScreening": "CLEARED (OFAC SDN, EU Consolidated, UN)",
+    "escrowCapacity": "$25,000,000 USD",
+    "recommendedTerms": "CIF Named Port • 100% Nexus Smart Escrow",
+    "regulatoryRisk": "Low (0.2/10)",
+    "executiveSummary": "Comprehensive automated due diligence for ..."
+  }
+
+
+================================================================================
+  2. EXPORTERS (CERTIFIED PRODUCERS)
+================================================================================
+
+Base Path: /api/v1/import-export/exporters/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/exporters/
+
+  Query Parameters (Filters):
+    ?country=India             — Filter by country
+    ?tier=Certified Producer (Tier-1)
+    ?status=Verified Supplier
+
+  Search:
+    ?search=Tata               — Searches: name, reference_id, contact_person, port_of_origin
+
+  Ordering:
+    ?ordering=-annual_export_capacity_usd
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "EXP-801",
+    "name": "Tata Steel Limited",
+    "country": "India",
+    "flag": "🏭",
+    "tier": "Certified Producer (Tier-1)",
+    "rating": "5.0 ★",
+    "annualExportCapacityUsd": "50000000.00",
+    "portOfOrigin": "JNPT Mumbai",
+    "specialties": ["Hot-Rolled Steel Coils", "Precision Tubes"],
+    "complianceCertificates": ["ISO 9001", "CE", "REACH"],
+    "productionLeadTime": "15 - 25 Days",
+    "moq": "1,000 Units",
+    "contactPerson": "Export Director",
+    "contactEmail": "exports@tata.in",
+    "bankPartner": "ICICI Bank",
+    "inspectionAgency": "SGS / TÜV Rheinland",
+    "status": "Verified Supplier",
+    "factoryAreaSqm": "50,000 m²",
+    "established": 1907,
+    "historicalExportsCount": 24
+  }
+
+RETRIEVE / CREATE / UPDATE / DELETE
+────────────────────────────────────
+  Same CRUD pattern as Importers.
+
+
+================================================================================
+  3. RFQ TENDERS (REQUEST FOR QUOTATION)
+================================================================================
+
+Base Path: /api/v1/import-export/rfqs/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/rfqs/
+
+  Query Parameters (Filters):
+    ?status=Open for Bidding
+    ?incoterm=CIF Destination
+    ?hs_code=8471.50.00
+
+  Search:
+    ?search=Machinery          — Searches: title, reference_id, buyer__name, hs_code
+
+  Ordering:
+    ?ordering=-target_budget_usd
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "RFQ-881",
+    "buyer": "uuid",
+    "buyerName": "Siemens AG",
+    "title": "Global Machinery Tender",
+    "hs_code": "8471.50.00",
+    "targetQuantity": "5,000 Units",
+    "targetBudgetUsd": "1000000.00",
+    "incoterm": "CIF Destination",
+    "deliveryDeadline": "45 Days from Escrow Lock",
+    "inspectionAgency": "SGS International Oracle",
+    "status": "Open for Bidding",
+    "proposals": [
+      {
+        "id": "uuid",
+        "bidder_name": "Tata Steel",
+        "totalPriceUsd": "980000.00",
+        "unitPriceUsd": "196.00",
+        "deliveryWindow": "30 Days",
+        "paymentTerms": "100% Nexus Smart Escrow",
+        "inspectionGuarantee": "SGS Pre-Shipment Inspection Included",
+        "isAccepted": false
+      }
+    ]
+  }
+
+CUSTOM ACTION: Public Tender
+─────────────────────────────
+  POST /api/v1/import-export/rfqs/public-tender/
+
+  Request Body:
+  {
+    "buyerId": "uuid (optional)",
+    "title": "Global Supply Demand Tender",
+    "hsCode": "8471.50.00",
+    "targetQuantity": "5,000 Units",
+    "targetBudgetUsd": 1000000.00,
+    "incoterm": "CIF Destination",
+    "deliveryDeadline": "45 Days from Escrow Lock"
+  }
+
+  Response: 201 Created — RFQ object
+
+
+================================================================================
+  4. CONSIGNMENT TRANSACTIONS & SMART ESCROW
+================================================================================
+
+Base Path: /api/v1/import-export/transactions/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/transactions/
+
+  Query Parameters (Filters):
+    ?stage_index=1             — Filter by stage (1-5)
+    ?status_badge=Escrow Locked
+    ?hs_code=8471.50.00
+
+  Search:
+    ?search=TX-74820           — Searches: title, bill_of_lading, buyer, seller, reference_id
+
+  Ordering:
+    ?ordering=-amount_usd
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "TX-74820",
+    "title": "$12.5M Steel Coils Consignment",
+    "buyer": "Siemens AG",
+    "buyer_flag": "🇩🇪",
+    "seller": "Tata Steel",
+    "seller_flag": "🇮🇳",
+    "amountUsd": "12500000.00",
+    "escrowStatus": "100% Vault Locked ($12.50M)",
+    "escrowProgress": 20,
+    "stageIndex": 1,
+    "billOfLading": "MSKU-748201-HH",
+    "shippingLine": "Maersk / CMA CGM Consortium",
+    "portOfLoading": "JNPT Mumbai",
+    "portOfDischarge": "Port of Hamburg",
+    "currentStage": "Stage 1: Contract Signed & 100% Escrow Vault Locked",
+    "eta": "2026-02-15",
+    "statusBadge": "Escrow Locked",
+    "lastUpdate": "",
+    "containerCount": 40,
+    "containerType": "40ft High Cube (HQ)",
+    "hsCode": "7208.51.00",
+    "incoterm": "CIF Named Port",
+    "smartVault": {
+      "contractAddress": "0xABCDEF...",
+      "multiSigRequirement": "3 of 4 Signatures Required",
+      "signatures": [
+        { "role": "Buyer Signatory", "signerName": "CFO", "signed": true, "timestamp": "..." },
+        { "role": "Seller Signatory", "signerName": "Director", "signed": false, "timestamp": "Pending" },
+        { "role": "SGS Inspection Oracle", "signerName": "SGS", "signed": false, "timestamp": "Pending" },
+        { "role": "Nexus Neutral Trustee", "signerName": "Nexus", "signed": false, "timestamp": "Pending" }
+      ],
+      "collateralRating": "AAA Backed by Bank Tier 1",
+      "fundsLockedUsd": "12500000.00",
+      "fundsReleasedUsd": "0.00"
+    },
+    "aisTelemetry": {
+      "vesselName": "MV Iron Titan",
+      "coordinates": "18.9388°N, 72.8354°E",
+      "currentSpeedKnots": "0.0 Knots",
+      "heading": "At Berth",
+      "nauticalMilesCovered": "0 NM",
+      "nextWaypoint": "Strait of Hormuz"
+    },
+    "documents": [
+      { "doc_type": "Commercial Invoice", "name": "Invoice.pdf", "file_url": "", "status": "Escrow Locked", "size": "500 KB" }
+    ]
+  }
+
+CUSTOM ACTION: Advance Milestone
+─────────────────────────────────
+  POST /api/v1/import-export/transactions/{id}/advance-milestone/
+
+  Description: Advances the consignment through 5 milestone stages.
+  Each stage automatically recalculates escrow progress and release amounts.
+
+  Stage Progression:
+    Stage 1 → Stage 2: 20% payout, escrow progress = 25%
+    Stage 2 → Stage 3: At sea, escrow progress = 50%
+    Stage 3 → Stage 4: 70% cumulative payout, escrow progress = 75%
+    Stage 4 → Stage 5: 100% settled, escrow progress = 100%
+
+  Response: Updated Transaction object
+
+CUSTOM ACTION: Sign Vault
+──────────────────────────
+  POST /api/v1/import-export/transactions/{id}/sign-vault/
+
+  Request Body:
+  {
+    "signerRole": "CEO"
+  }
+
+  Description: Registers a cryptographic multi-sig signature on the 3-of-4 escrow vault.
+  Response: Updated Transaction object
+
+
+================================================================================
+  5. CEO EXECUTIVE APPROVALS DESK
+================================================================================
+
+Base Path: /api/v1/import-export/ceo/approvals/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/ceo/approvals/
+
+  Query Parameters (Filters):
+    ?status=Pending Authorization
+    ?urgent=true
+    ?department=Trade Finance & Escrow Treasury
+
+  Search:
+    ?search=Steel              — Searches: title, buyer, seller, reference_id
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "APP-901",
+    "title": "Approve $12.5M Steel Consignment",
+    "buyer": "Siemens AG",
+    "seller": "Tata Steel",
+    "valueUsd": "12500000.00",
+    "department": "Trade Finance & Escrow Treasury",
+    "riskScore": "Low (1.8/10)",
+    "urgent": true,
+    "memo": "High-priority quarterly deal...",
+    "status": "Pending Authorization",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+
+CUSTOM ACTION: Approve
+──────────────────────
+  POST /api/v1/import-export/ceo/approvals/{id}/approve/
+
+  Response: { "status": "Authorized", "id": "APP-901" }
+
+CUSTOM ACTION: Reject
+─────────────────────
+  POST /api/v1/import-export/ceo/approvals/{id}/reject/
+
+  Request Body:
+  { "reason": "Audit requested" }
+
+  Response: { "status": "Flagged", "id": "APP-901" }
+
+CUSTOM ACTION: Bulk Approve
+────────────────────────────
+  POST /api/v1/import-export/ceo/approvals/bulk-approve/
+
+  Description: Atomically authorizes all pending high-value deals in queue.
+  Response: { "status": "All Authorized", "count": 5 }
+
+
+================================================================================
+  6. COMPLIANCE & SANCTIONS RADAR
+================================================================================
+
+Base Path: /api/v1/import-export/compliance/sanctions/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/compliance/sanctions/
+
+  Query Parameters (Filters):
+    ?status=Cleared & Whitelisted
+    ?country=Germany
+
+  Search:
+    ?search=entity             — Searches: entity_name, reference_id, certificate_hash
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "SANC-4821",
+    "entityName": "Screened Entity",
+    "country": "Germany",
+    "flag": "🇩🇪",
+    "entityType": "Screened Entity",
+    "watchlistsChecked": ["OFAC SDN", "EU Consolidated", "UN Sanctions", "FATF Clean"],
+    "riskScore": "0.1 / 10 (Clean)",
+    "status": "Cleared & Whitelisted",
+    "certificateHash": "0xABCDEF...",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+
+CUSTOM ACTION: Screen Entity
+─────────────────────────────
+  POST /api/v1/import-export/compliance/sanctions/screen/
+
+  Request Body:
+  {
+    "entityName": "Siemens AG",
+    "country": "Germany"
+  }
+
+  Response: 201 Created — New SanctionsLog entry with auto-generated certificate hash
+
+
+================================================================================
+  7. HR STAFF MANAGEMENT
+================================================================================
+
+Base Path: /api/v1/import-export/hr/staff/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/hr/staff/
+
+  Query Parameters (Filters):
+    ?department=Trade Operations
+    ?status=On Duty (Active)
+    ?clearance_level=Level 3 (Executive)
+
+  Search:
+    ?search=John               — Searches: name, role, employee_id, email
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "employeeId": "EMP-101",
+    "name": "John Smith",
+    "role": "Trade Finance Analyst",
+    "department": "Trade Operations",
+    "location": "Frankfurt HQ",
+    "timezone": "UTC+1",
+    "email": "john@nexus.eu",
+    "clearanceLevel": "Level 2 (Standard)",
+    "baseSalaryUsd": "120000.00",
+    "monthlyCommissionUsd": "5000.00",
+    "activeCaseload": 8,
+    "performanceRating": "95.0%",
+    "status": "On Duty (Active)",
+    "avatarBg": "bg-teal-500/20 text-teal-400"
+  }
+
+CUSTOM ACTION: Payroll Disburse
+────────────────────────────────
+  POST /api/v1/import-export/hr/staff/payroll/disburse/
+
+  Response:
+  {
+    "status": "Disbursed",
+    "employeesProcessed": 15,
+    "currency": "USD",
+    "message": "Global automated payroll executed for 15 international staff."
+  }
+
+
+================================================================================
+  8. HR JOB VACANCIES
+================================================================================
+
+Base Path: /api/v1/import-export/hr/vacancies/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/hr/vacancies/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "VAC-12",
+    "title": "Senior Trade Analyst",
+    "department": "Trade Operations",
+    "location": "Frankfurt",
+    "jobType": "Full-Time",
+    "applicantsCount": 45,
+    "urgency": "Priority",
+    "salaryRange": "$120,000 - $150,000"
+  }
+
+
+================================================================================
+  9. ACCOUNTS LEDGER
+================================================================================
+
+Base Path: /api/v1/import-export/accounts/ledger/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/accounts/ledger/
+
+  Query Parameters (Filters):
+    ?entry_type=Deposit (Credit)
+    ?category=Escrow Settlement
+    ?status=Completed
+
+  Search:
+    ?search=LED-9102           — Searches: reference_id, tx_ref, description
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "LED-9102",
+    "txRef": "TX-74820",
+    "description": "20% Milestone Release for Steel Consignment",
+    "entryType": "Disbursement (Debit)",
+    "category": "Escrow Settlement",
+    "amountUsd": "2500000.00",
+    "feeEarnedUsd": "25000.00",
+    "status": "Completed",
+    "ledgerHash": "0xABCDEF...",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+
+
+================================================================================
+  10. TREASURY RESERVES
+================================================================================
+
+Base Path: /api/v1/import-export/accounts/treasury/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/accounts/treasury/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "currency": "USD",
+    "name": "NEXUS Primary USD Reserve",
+    "balanceFormatted": "$45,200,000.00",
+    "balanceUsd": "45200000.00",
+    "sharePercent": "62.4%",
+    "bank": "Deutsche Bank AG",
+    "tier": "Tier 1 Reserve"
+  }
+
+
+================================================================================
+  11. STRATEGIC TIE-UPS (MoU)
+================================================================================
+
+Base Path: /api/v1/import-export/tieups/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/tieups/
+
+  Query Parameters (Filters):
+    ?partner_type=Port Authority
+    ?status=Active Agreement
+    ?country=Germany
+
+  Search:
+    ?search=Hamburg             — Searches: partner_name, reference_id, scope
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "reference_id": "MOU-501",
+    "partnerName": "Hamburg Port Authority",
+    "partnerType": "Port Authority",
+    "country": "Germany",
+    "flag": "🤝",
+    "scope": "Priority berthing and customs fast-track",
+    "signedDate": "2025-06-01",
+    "status": "Active Agreement",
+    "mouDocumentUrl": "https://..."
+  }
+
+
+================================================================================
+  12. PORTAL ARTICLES
+================================================================================
+
+Base Path: /api/v1/import-export/portal/articles/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/portal/articles/
+
+  Query Parameters (Filters):
+    ?category=Maritime Logistics
+    ?is_featured=true
+
+  Search:
+    ?search=maritime           — Searches: title, summary, author
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "title": "Global Maritime Trade Trends 2026",
+    "slug": "global-maritime-trade-trends-2026",
+    "summary": "Analysis of shipping route optimization...",
+    "content": "Full article content...",
+    "category": "Maritime Logistics",
+    "author": "NEXUS Research Desk",
+    "readTime": "5 min read",
+    "publishedAt": "2026-01-15T10:30:00Z",
+    "isFeatured": true
+  }
+
+
+================================================================================
+  13. PORTAL DEMANDS
+================================================================================
+
+Base Path: /api/v1/import-export/portal/demands/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/import-export/portal/demands/
+
+  Query Parameters (Filters):
+    ?urgency=High Urgency
+    ?status=Sourcing Active
+    ?destination_country=Germany
+
+  Search:
+    ?search=Steel              — Searches: title, hs_code, origin_country
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "title": "Hot-Rolled Steel Coils",
+    "hsCode": "7208.51.00",
+    "originCountry": "India",
+    "destinationCountry": "Germany",
+    "volume": "5,000 MT",
+    "urgency": "High Urgency",
+    "budgetUsd": "12500000.00",
+    "status": "Sourcing Active"
+  }
+
+
+================================================================================
+  14. PORTAL PLATFORM METRICS (KPI DASHBOARD)
+================================================================================
+
+  GET /api/v1/import-export/portal/metrics/
+
+  Description: Returns live aggregated platform-wide KPI metrics.
+  No filters or parameters required.
+
+  Response:
+  {
+    "totalVolume": "$1.48B",
+    "activeTrades": 1420,
+    "registeredExporters": 3840,
+    "customsClearanceRate": "99.4%",
+    "totalTradeVolumeUsd": "$125,750,000.00",
+    "activeConsignmentsCount": 8,
+    "vesselsInTransitCount": 3,
+    "clearedSanctionsEntities": 42,
+    "openTendersCount": 5,
+    "treasuryReservesUsd": "$72,400,000.00",
+    "verifiedImportersCount": 15,
+    "verifiedExportersCount": 10,
+    "averageEscrowSettlementTime": "18.4 Days",
+    "networkCollateralRating": "AAA Bank Tier 1",
+    "platformStatus": "All Systems Operational • Smart Vaults Online"
+  }
+
+
+================================================================================
+  15. GOVERNANCE & ESCROW SETTINGS
+================================================================================
+
+  Base Path: /api/v1/import-export/settings/
+
+  GET /api/v1/import-export/settings/
+  Response:
+  {
+    "escrowFeePercent": "1.25",
+    "sanctionsAutoScreen": true,
+    "multiSigQuorum": "3 of 4",
+    "oracleInspectionRequired": true,
+    "autoDisbursePayroll": true,
+    "aisTelemetryTracking": true
+  }
+
+  PATCH /api/v1/import-export/settings/
+  Payload:
+  {
+    "escrowFeePercent": "1.50",
+    "sanctionsAutoScreen": true
+  }
+  Response: Updated settings object (200 OK).
+
+
+================================================================================
+  COMMON NOTES
+================================================================================
+
+  • Authentication: All endpoints use AllowAny (public access) in development; JWT Bearer in production.
+  • Identifier Mapping: All endpoints seamlessly accept and return both human-readable IDs ('IMP-9201', 'TX-90412') and UUIDs.
+  • Pagination: DRF default pagination applies.
+  • Content-Type: application/json
+  • Date Format: ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
+  • All ViewSets support the DRF browsable API at each endpoint URL.
+  • DefaultRouter auto-generates API root index at /api/v1/import-export/
+
+================================================================================
+  END OF IMPORT/EXPORT API DOCUMENTATION
+================================================================================

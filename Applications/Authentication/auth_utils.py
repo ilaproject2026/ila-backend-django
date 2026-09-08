@@ -44,7 +44,7 @@ def set_auth_cookies(response, refresh):
         secure=secure,
         samesite=samesite,
         path="/",
-        max_age=360000
+        max_age=3600  # 1 hour
     )
     response.set_cookie(
         "refresh_token",
@@ -53,7 +53,7 @@ def set_auth_cookies(response, refresh):
         secure=secure,
         samesite=samesite,
         path="/",
-        max_age=7 * 24 * 360000
+        max_age=7 * 24 * 3600  # 7 days
     )
 
 def set_access_cookie(response, access_token):
@@ -68,7 +68,7 @@ def set_access_cookie(response, access_token):
         secure=secure,
         samesite=samesite,
         path="/",
-        max_age=360000
+        max_age=3600  # 1 hour
     )
 
 def delete_auth_cookies(response):

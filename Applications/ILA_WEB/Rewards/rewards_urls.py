@@ -4,7 +4,7 @@ from .rewards_views import ReferralRecordViewSet, TierRuleViewSet
 
 router = DefaultRouter()
 router.register(r'referrals', ReferralRecordViewSet, basename='referral')
-router.register(r'matrix', TierRuleViewSet, basename='tier-matrix')
+router.register(r'tiers', TierRuleViewSet, basename='tier-rules')
 
 urlpatterns = [
     path('', include(router.urls)),

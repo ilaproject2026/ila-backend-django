@@ -1,0 +1,254 @@
+{
+  "info": {
+    "_postman_id": "ila-business-studio-api-collection-v1",
+    "name": "ILA BusinessStudio API",
+    "description": "Postman API Collection for ILA BusinessStudio & StudioCore backend endpoints.\n\nIncludes:\n- Strategic AI Executive Consultant (Gemini 2.5 Flash)\n- Corporate Expansion Application & Lead Ingestion\n- German GmbH Setup Package Tiers\n- Admin JWT Authentication\n\nBase URL default: http://127.0.0.1:8000",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "application_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "package_slug",
+      "value": "standard",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Authentication",
+      "description": "Obtain JWT token to authenticate admin requests (listing applications).",
+      "item": [
+        {
+          "name": "Login (Obtain Admin Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access);",
+                  "    console.log('access_token automatically saved to collection variables.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login", ""]
+            },
+            "description": "Authenticates user and returns access/refresh JWT tokens. Stores access_token in collection variable."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. AI Strategy Assistant (Gemini)",
+      "description": "Interactive corporate advisory endpoints powered by Google Gemini 2.0 Flash.",
+      "item": [
+        {
+          "name": "Consult Assistant (Initial Prompt)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"What are the capital requirements and compliance steps for an Indian tech founder to incorporate a German GmbH remotely?\",\n  \"history\": [],\n  \"session_id\": \"test-session-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/assistant/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "assistant", "chat", ""]
+            },
+            "description": "Sends a strategic advisory prompt to the Gemini consultant. Returns tailored strategic guidance."
+          },
+          "response": []
+        },
+        {
+          "name": "Consult Assistant (With History)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"How does ILA protect our IP and bank account setup during this process?\",\n  \"history\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"What are the capital requirements and compliance steps for an Indian tech founder to incorporate a German GmbH remotely?\"\n    },\n    {\n      \"role\": \"model\",\n      \"content\": \"German GmbH incorporation requires a minimum share capital of €25,000, with at least €12,500 deposited upon notary registration. Non-EU founders can establish full remote ownership with professional corporate administration and physical compliance in Germany.\"\n    }\n  ],\n  \"session_id\": \"test-session-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/assistant/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "assistant", "chat", ""]
+            },
+            "description": "Allows multi-turn conversational context to be passed to the Gemini advisor."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Applications (Eligibility Assessment)",
+      "description": "Endpoints to submit customer assessments and manage incoming leads.",
+      "item": [
+        {
+          "name": "Submit Application (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) {",
+                  "    pm.collectionVariables.set('application_id', jsonData.id);",
+                  "    console.log('application_id saved:', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Vikramaditya Sharma\",\n  \"email\": \"vikram@zenithventures.in\",\n  \"business_name\": \"Zenith Ventures Global\",\n  \"industry\": \"Enterprise SaaS & AI\",\n  \"package_option\": \"standard\",\n  \"notes\": \"Planning European subsidiary incorporation for Q3 fiscal year with cross-border banking.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/applications/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "applications", ""]
+            },
+            "description": "Public endpoint: Submits a new business studio eligibility assessment and application."
+          },
+          "response": []
+        },
+        {
+          "name": "List Applications (Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/applications/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "applications", ""]
+            },
+            "description": "Admin endpoint: Retrieves list of all submitted applications and customer leads."
+          },
+          "response": []
+        },
+        {
+          "name": "Retrieve Application Detail (Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/applications/{{application_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "applications", "{{application_id}}", ""]
+            },
+            "description": "Admin endpoint: Retrieves single application detail by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Package Tiers (Pricing & Setup Options)",
+      "description": "Public read-only endpoints providing corporate package tier specifications.",
+      "item": [
+        {
+          "name": "List Active Packages (Public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/packages/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "packages", ""]
+            },
+            "description": "Retrieves active package tiers, pricing, share capital requirements, and feature inclusions."
+          },
+          "response": []
+        },
+        {
+          "name": "Retrieve Package by Slug/ID (Public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/studio/packages/{{package_slug}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "studio", "packages", "{{package_slug}}", ""]
+            },
+            "description": "Retrieves detailed information for a specific package tier (e.g. 'standard')."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

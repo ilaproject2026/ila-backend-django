@@ -90,7 +90,7 @@ class VerifyOTPView(APIView):
         return Response({"message": message}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(rate_limit(key='ip', rate='3/m', block=True), name='post')
+@method_decorator(rate_limit(key='ip', rate='60/m', block=True), name='post')
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -195,7 +195,11 @@ class SecurityGateVerifyView(APIView):
         if not pin:
             return Response({'error': 'PIN code is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        valid_pins = ['7890', 'ILA2026']
+        from django.conf import settings as django_settings
+        from decouple import config as dtconfig
+        # Read security PINs from environment (comma-separated), fallback to defaults for dev
+        raw_pins = dtconfig('SECURITY_GATE_PINS', default='7890,ILA2026')
+        valid_pins = [p.strip() for p in raw_pins.split(',') if p.strip()]
         user = request.user if request.user and request.user.is_authenticated else None
         
         # Check global override PINs or user specific pin

@@ -4,9 +4,11 @@ certifi==2026.7.22
 charset-normalizer==3.5.1
 Django==6.1
 django-cors-headers==4.9.0
+django-filter==26.1
 django-smart-ratelimit==4.12.1
 djangorestframework==3.18.0
 djangorestframework_simplejwt==5.5.1
+google-genai
 drf-spectacular==0.30.0
 hiredis==3.4.1
 idna==3.19

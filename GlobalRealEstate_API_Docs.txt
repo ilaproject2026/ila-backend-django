@@ -1,0 +1,873 @@
+================================================================================
+  ILA GLOBAL REAL ESTATE & CO-LIVING PLATFORM — API DOCUMENTATION
+  Application: Applications.GlobalRealEstate
+  Base URL: /api/v1/global-real-estate/
+================================================================================
+
+Generated: 2026-09-08
+Django REST Framework Backend — AllowAny (Public) Endpoints
+All endpoints return JSON. UUID primary keys. Pagination via DRF defaults.
+
+================================================================================
+  TABLE OF CONTENTS
+================================================================================
+
+  1.  Health Check
+  2.  Properties
+  3.  Rooms
+  4.  Master Leases (with Auto Room Generation)
+  5.  Tenants & Growth Loop
+  6.  Duty Rosters (Hygiene)
+  7.  Hygiene Penalties (Read-Only)
+  8.  ERP — Invoices
+  9.  ERP — Staff (Read-Only)
+  10. ERP — Kanban Tasks
+  11. ERP — Maintenance Tickets
+  12. Brokers
+  13. Marketing Campaigns
+  14. Commercial Deals (Read-Only)
+  15. Supply Products
+  16. Compliance Audits (Read-Only)
+  17. Expansion Hub KPIs (Read-Only)
+
+
+================================================================================
+  1. HEALTH CHECK
+================================================================================
+
+  GET /api/v1/global-real-estate/health/
+
+  Response:
+  {
+    "status": "healthy",
+    "service": "ila-global-proptech-drf",
+    "timestamp": "2026-09-08T10:30:00.000000+00:00"
+  }
+
+
+================================================================================
+  2. PROPERTIES
+================================================================================
+
+Base Path: /api/v1/global-real-estate/properties/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/properties/
+
+  Query Parameters (Filters):
+    ?city=Frankfurt            — Filter by city
+    ?city_code=FFM             — Filter by city code (FFM, LDN, DXB, SIN, NYC)
+    ?featured=true             — Filter featured properties
+    ?syndication_active=true   — Filter syndication status
+
+  Additional Custom Filters:
+    ?max_rent=400              — Filter properties with rooms ≤ given rent
+    ?room_type=Co-Living Studio — Filter by room type (All, Private Ensuite, Co-Living Studio, etc.)
+
+  Search (case-insensitive partial match):
+    ?search=Frankfurt          — Searches: title, city, country, neighborhood
+
+  Ordering:
+    ?ordering=-total_valuation — Order by: created_at, total_valuation, projected_roi_pct
+    ?ordering=projected_roi_pct
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "master_lease": "uuid",
+    "property_uid": "GLB-FFM-BLD1",
+    "title": "ILA Residenz Frankfurt Hauptbahnhof",
+    "city": "Frankfurt",
+    "city_code": "FFM",
+    "country": "Germany",
+    "neighborhood": "Prime Central Hub",
+    "address": "Mainzer Landstraße 100, 60327 Frankfurt",
+    "image_url": "https://images.unsplash.com/...",
+    "images": [],
+    "amenities": ["Ultra-Fast WiFi", "Bi-Weekly Cleaning", "Co-Working Lounge", "Smart Locks"],
+    "total_rooms": 12,
+    "active_occupancy": 10,
+    "featured": true,
+    "syndication_active": true,
+    "total_valuation": "972000.00",
+    "co_invest_target": "216000.00",
+    "co_invest_raised": "54000.00",
+    "projected_roi_pct": "16.20",
+    "description": "Master lease structured property in Frankfurt.",
+    "created_at": "2026-01-15T10:30:00Z",
+    "rooms": [
+      {
+        "id": "uuid",
+        "property": "uuid",
+        "room_uid": "GLB-FFM-BLD1-RM1",
+        "room_number": "101",
+        "room_type": "Co-Living Studio",
+        "sqm": "18.00",
+        "regular_rent_amount": "420.00",
+        "micro_investor_rent_amount": "310.00",
+        "security_deposit_amount": "420.00",
+        "currency": "EUR",
+        "is_available": true,
+        "floor": 1,
+        "features": ["High-speed WiFi", "Wardrobe", "Desk", "Keycard Access"],
+        "created_at": "2026-01-15T10:30:00Z"
+      }
+    ]
+  }
+
+RETRIEVE / CREATE / UPDATE / DELETE
+────────────────────────────────────
+  GET    /api/v1/global-real-estate/properties/{id}/
+  POST   /api/v1/global-real-estate/properties/
+  PUT    /api/v1/global-real-estate/properties/{id}/
+  PATCH  /api/v1/global-real-estate/properties/{id}/
+  DELETE /api/v1/global-real-estate/properties/{id}/
+
+
+================================================================================
+  3. ROOMS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/rooms/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/rooms/
+
+  Query Parameters (Filters):
+    ?property={uuid}           — Filter by parent property UUID
+    ?room_type=Private Ensuite — Filter by type
+    ?is_available=true         — Filter available rooms
+    ?currency=EUR              — Filter by currency
+
+  Search:
+    ?search=GLB-FFM-BLD1-RM1  — Searches: room_uid, room_number
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "property": "uuid",
+    "room_uid": "GLB-FFM-BLD1-RM1",
+    "room_number": "101",
+    "room_type": "Co-Living Studio",
+    "sqm": "18.00",
+    "regular_rent_amount": "420.00",
+    "micro_investor_rent_amount": "310.00",
+    "security_deposit_amount": "420.00",
+    "currency": "EUR",
+    "is_available": true,
+    "floor": 1,
+    "features": ["High-speed WiFi", "Wardrobe", "Desk", "Keycard Access"],
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+
+
+================================================================================
+  4. MASTER LEASES (WITH AUTO ROOM GENERATION)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/master-leases/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST / RETRIEVE
+───────────────
+  GET /api/v1/global-real-estate/master-leases/
+  GET /api/v1/global-real-estate/master-leases/{id}/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "landlord": "uuid | null",
+    "landlord_name": "Braun Hausverwaltung GmbH",
+    "landlord_email": "braun@haus.de",
+    "landlord_phone": "+49 69 987654",
+    "building_name": "ILA Residenz Frankfurt Hauptbahnhof",
+    "city_code": "FFM",
+    "city_name": "Frankfurt",
+    "country": "Germany",
+    "address": "Mainzer Landstraße 100, 60327 Frankfurt",
+    "total_floors": 4,
+    "total_capacity": 12,
+    "monthly_master_rent": "4500.00",
+    "currency": "EUR",
+    "lease_start_date": "2026-01-01",
+    "lease_end_date": "2029-01-01",
+    "status": "ACTIVE",
+    "generated_property_uid": "GLB-FFM-BLD1",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+
+CREATE (Auto-generates Property + Rooms)
+─────────────────────────────────────────
+  POST /api/v1/global-real-estate/master-leases/
+
+  Request Body:
+  {
+    "lease_data": {
+      "landlord_name": "New Owner GmbH",
+      "landlord_email": "owner@gmbh.de",
+      "landlord_phone": "+49 69 123456",
+      "building_name": "ILA Tower Munich",
+      "city_code": "MUC",
+      "city_name": "Munich",
+      "country": "Germany",
+      "address": "Leopoldstraße 50, 80802 München",
+      "total_floors": 5,
+      "total_capacity": 20,
+      "monthly_master_rent": 6000.00,
+      "currency": "EUR",
+      "lease_start_date": "2026-06-01",
+      "lease_end_date": "2029-06-01"
+    },
+    "rooms_count": 20
+  }
+
+  Description: This endpoint atomically creates:
+    1. A MasterLease record
+    2. A Property record linked to the lease
+    3. N individual Room records (based on rooms_count)
+
+  Room auto-generation logic:
+    - Room UID: GLB-{CITY_CODE}-BLD{N}-RM{index}
+    - Room types alternate: Co-Living Studio / Private Ensuite
+    - Rent amounts vary by index for realistic pricing
+
+  Response: 201 Created
+  {
+    "master_lease": { ... MasterLease object ... },
+    "property": { ... Property object with nested rooms ... }
+  }
+
+
+================================================================================
+  5. TENANTS & GROWTH LOOP
+================================================================================
+
+Base Path: /api/v1/global-real-estate/tenants/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST / RETRIEVE
+───────────────
+  GET /api/v1/global-real-estate/tenants/
+  GET /api/v1/global-real-estate/tenants/{id}/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "django_user": null,
+    "full_name": "Aarav Sharma",
+    "email": "aarav@ila-global.eu",
+    "phone": "+49 176 12345678",
+    "avatar_url": "https://...",
+    "role": "MICRO_INVESTOR",
+    "option_type": "OPTION_B",
+    "assigned_property": "uuid",
+    "assigned_room": "uuid",
+    "assigned_room_uid": "GLB-FFM-BLD1-RM3",
+    "property_title": "ILA Residenz Frankfurt",
+    "city": "Frankfurt",
+    "lease_start_date": "2026-01-15",
+    "lease_end_date": "2029-01-15",
+    "monthly_rent_charged": "330.00",
+    "deposit_held": "450.00",
+    "wallet_balance": "1250.00",
+    "total_micro_invested": "5000.00",
+    "active_profit_share_tier": "Silver (25%)",
+    "active_commission_pct": "25.00",
+    "referral_code": "ILA-AARAV-7X9",
+    "hygiene_score": 100,
+    "created_at": "2026-01-15T10:30:00Z",
+    "documents": [ ... DocumentRecord objects ... ],
+    "referrals": [ ... PlacedTenantReferral objects ... ],
+    "profit_ledger": [ ... ProfitShareLedgerEntry objects ... ]
+  }
+
+CUSTOM ACTION: Get Current Tenant Profile
+──────────────────────────────────────────
+  GET /api/v1/global-real-estate/tenants/me/
+
+  Description: Returns the authenticated user's tenant profile,
+               or the first tenant in the database for unauthenticated requests.
+
+  Response: TenantUser object (with nested documents, referrals, profit_ledger)
+
+CUSTOM ACTION: Update Option Type
+──────────────────────────────────
+  POST /api/v1/global-real-estate/tenants/me/update_option/
+
+  Request Body:
+  {
+    "option_type": "OPTION_B"
+  }
+
+  Options:
+    OPTION_A — Standard Market Lease (€450/mo, 0% commission)
+    OPTION_B — Micro-Investor Discounted (€330/mo, 25% commission)
+
+  Response: Updated TenantUser object
+
+CUSTOM ACTION: Relocation Growth Loop
+──────────────────────────────────────
+  POST /api/v1/global-real-estate/tenants/me/relocation_loop/
+
+  Request Body:
+  {
+    "new_property_id": "uuid (optional)",
+    "new_room_id": "uuid (optional)",
+    "placed_tenant_name": "New Resident Name"
+  }
+
+  Description: Executes the Growth Loop — places a new tenant in the
+  current tenant's old room, grants €250 wallet bonus, creates a
+  PlacedTenantReferral record, and logs a GROWTH_LOOP_BONUS in the profit ledger.
+
+  Response: Updated TenantUser object
+
+CUSTOM ACTION: Withdraw Funds
+─────────────────────────────
+  POST /api/v1/global-real-estate/tenants/me/withdraw/
+
+  Request Body:
+  {
+    "amount": 500.00
+  }
+
+  Description: Withdraws from wallet balance via SEPA/SWIFT transfer.
+  Returns 400 if insufficient balance.
+
+  Response: { "success": true, "new_balance": 750.00 }
+
+CUSTOM ACTION: Reinvest Funds
+─────────────────────────────
+  POST /api/v1/global-real-estate/tenants/me/reinvest/
+
+  Request Body:
+  {
+    "amount": 300.00
+  }
+
+  Description: Reinvests wallet balance into the Global Real Estate Pool.
+  Increases total_micro_invested. Returns 400 if insufficient balance.
+
+  Response:
+  {
+    "success": true,
+    "new_balance": 450.00,
+    "new_total_invested": 5300.00
+  }
+
+
+================================================================================
+  6. DUTY ROSTERS (HYGIENE)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/duty-rosters/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST / RETRIEVE
+───────────────
+  GET /api/v1/global-real-estate/duty-rosters/
+  GET /api/v1/global-real-estate/duty-rosters/{id}/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "property": "uuid",
+    "property_title": "ILA Residenz Frankfurt",
+    "tenant": "uuid",
+    "tenant_name": "Aarav Sharma",
+    "tenant_avatar": "https://...",
+    "assigned_zone": "Kitchen & Common Area",
+    "scheduled_date": "2026-02-10",
+    "day_of_week": "Monday",
+    "due_time": "22:00",
+    "status": "PENDING",
+    "photo_proof_url": null,
+    "submitted_at": null,
+    "reviewed_by": null,
+    "review_notes": null,
+    "penalty_amount": "0.00"
+  }
+
+CUSTOM ACTION: Submit Proof
+───────────────────────────
+  POST /api/v1/global-real-estate/duty-rosters/{id}/submit_proof/
+
+  Request Body:
+  {
+    "photo_proof_url": "https://storage.example.com/proof-img.jpg"
+  }
+
+  Description: Submits cleaning photo proof. Sets status to SUBMITTED_FOR_REVIEW.
+  Response: Updated DutyRosterTask object
+
+CUSTOM ACTION: Approve Task
+───────────────────────────
+  POST /api/v1/global-real-estate/duty-rosters/{id}/approve/
+
+  Request Body:
+  {
+    "reviewer_name": "Hans Mueller",
+    "review_notes": "Verified and approved."
+  }
+
+  Response: Updated DutyRosterTask object (status = APPROVED)
+
+CUSTOM ACTION: Reject Task (with Penalty)
+─────────────────────────────────────────
+  POST /api/v1/global-real-estate/duty-rosters/{id}/reject/
+
+  Request Body:
+  {
+    "reviewer_name": "Hans Mueller",
+    "reason": "Kitchen not cleaned properly."
+  }
+
+  Description: Rejects the task, applies €35 penalty:
+    1. DutyRosterTask status → REJECTED_PENALIZED
+    2. Creates HygienePenalty record
+    3. Deducts €35 from tenant's security deposit
+    4. Reduces tenant's hygiene_score by 8 points
+
+  Response:
+  {
+    "task": { ... DutyRosterTask object ... },
+    "penalty": { ... HygienePenalty object ... }
+  }
+
+
+================================================================================
+  7. HYGIENE PENALTIES (READ-ONLY)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/hygiene-penalties/
+
+Methods: GET only (ReadOnlyModelViewSet)
+
+LIST / RETRIEVE
+───────────────
+  GET /api/v1/global-real-estate/hygiene-penalties/
+  GET /api/v1/global-real-estate/hygiene-penalties/{id}/
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "duty_roster": "uuid",
+    "tenant": "uuid",
+    "tenant_name": "Aarav Sharma",
+    "property_uid": "GLB-FFM-BLD1",
+    "penalty_amount": "35.00",
+    "currency": "EUR",
+    "reason": "Cleaning rejected by Hans: Kitchen not cleaned properly.",
+    "deducted_from": "DEPOSIT_LEDGER",
+    "status": "DEDUCTED",
+    "logged_at": "2026-02-10 22:30"
+  }
+
+
+================================================================================
+  8. ERP — INVOICES
+================================================================================
+
+Base Path: /api/v1/global-real-estate/invoices/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/invoices/
+
+  Query Parameters (Filters):
+    ?status=PAID
+    ?category=Monthly Rent
+
+  Search:
+    ?search=INV-0001           — Searches: invoice_number, recipient_name, property_uid
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "invoice_number": "INV-0001",
+    "recipient_name": "Aarav Sharma",
+    "recipient_email": "aarav@ila-global.eu",
+    "property_uid": "GLB-FFM-BLD1",
+    "amount": "330.00",
+    "currency": "EUR",
+    "category": "Monthly Rent",
+    "issue_date": "2026-02-01",
+    "due_date": "2026-02-05",
+    "status": "PAID"
+  }
+
+
+================================================================================
+  9. ERP — STAFF (READ-ONLY)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/staff/
+
+Methods: GET only (ReadOnlyModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/staff/
+
+  Query Parameters (Filters):
+    ?department=Operations
+    ?hub=Frankfurt
+
+  Search:
+    ?search=Manager            — Searches: name, role, email
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "name": "Maria Schmidt",
+    "role": "Property Manager",
+    "department": "Operations",
+    "hub": "Frankfurt Hub",
+    "email": "maria@ila-global.eu",
+    "phone": "+49 69 123456",
+    "active_tasks_count": 5,
+    "avatar": "https://..."
+  }
+
+
+================================================================================
+  10. ERP — KANBAN TASKS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/kanban-tasks/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/kanban-tasks/
+
+  Query Parameters (Filters):
+    ?status=TODO               — (TODO, IN_PROGRESS, REVIEW, COMPLETED)
+    ?priority=HIGH             — (LOW, MEDIUM, HIGH, URGENT)
+    ?department=Operations
+
+  Search:
+    ?search=plumbing           — Searches: title, assigned_to_name, property_uid
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "title": "Fix plumbing in Room 103",
+    "description": "Leaking faucet reported by tenant.",
+    "assigned_to_name": "Technician Hans",
+    "department": "Maintenance",
+    "priority": "HIGH",
+    "status": "TODO",
+    "property_uid": "GLB-FFM-BLD1",
+    "due_date": "2026-02-15"
+  }
+
+
+================================================================================
+  11. ERP — MAINTENANCE TICKETS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/maintenance-tickets/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/maintenance-tickets/
+
+  Query Parameters (Filters):
+    ?status=DISPATCHED
+    ?priority=HIGH
+    ?category=Plumbing
+
+  Search:
+    ?search=MNT-001            — Searches: ticket_code, title, tenant_name, property_uid
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "ticket_code": "MNT-001",
+    "property_uid": "GLB-FFM-BLD1",
+    "room_uid": "GLB-FFM-BLD1-RM3",
+    "tenant_name": "Aarav Sharma",
+    "category": "Plumbing",
+    "title": "Leaking faucet in bathroom",
+    "description": "Water dripping from kitchen faucet",
+    "priority": "HIGH",
+    "status": "DISPATCHED",
+    "assigned_contractor": "Klempner GmbH",
+    "cost_estimate": "150.00",
+    "logged_date": "2026-02-10"
+  }
+
+
+================================================================================
+  12. BROKERS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/brokers/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/brokers/
+
+  Query Parameters (Filters):
+    ?status=ACTIVE
+
+  Search:
+    ?search=Jones              — Searches: name, agency, referral_code
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "name": "Emily Jones",
+    "agency": "Frankfurt Relocation Services",
+    "email": "emily@frs.de",
+    "phone": "+49 176 987654",
+    "referral_code": "BRK-EMILY-12",
+    "total_placements": 15,
+    "total_commission_paid": "7500.00",
+    "pending_payout": "1500.00",
+    "commission_rate_pct": "10.00",
+    "status": "ACTIVE"
+  }
+
+CUSTOM ACTION: Pay Commission
+─────────────────────────────
+  POST /api/v1/global-real-estate/brokers/{id}/pay_commission/
+
+  Description: Settles the broker's pending payout.
+  Adds pending_payout to total_commission_paid and resets pending_payout to 0.
+
+  Response: Updated BrokerRecord object
+
+
+================================================================================
+  13. MARKETING CAMPAIGNS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/campaigns/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/campaigns/
+
+  Query Parameters (Filters):
+    ?status=ACTIVE
+    ?channel=Google Ads
+    ?target_city=Frankfurt
+
+  Search:
+    ?search=Summer             — Searches: title, target_segment
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "title": "Summer Move-In Campaign 2026",
+    "channel": "Google Ads",
+    "target_segment": "Young Professionals",
+    "target_city": "Frankfurt",
+    "budget": "5000.00",
+    "leads_generated": 120,
+    "conversions": 18,
+    "status": "ACTIVE"
+  }
+
+CUSTOM ACTION: Broadcast Campaign
+──────────────────────────────────
+  POST /api/v1/global-real-estate/campaigns/{id}/broadcast/
+
+  Description: Simulates a campaign broadcast. Adds 15 leads and 3 conversions.
+
+  Response: Updated MarketingCampaign object
+
+
+================================================================================
+  14. COMMERCIAL DEALS (READ-ONLY)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/commercial-deals/
+
+Methods: GET only (ReadOnlyModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/commercial-deals/
+
+  Query Parameters (Filters):
+    ?status=STRUCTURING
+    ?city=London
+    ?country=UK
+
+  Search:
+    ?search=DL-001             — Searches: deal_code, title
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "deal_code": "DL-001",
+    "title": "London Canary Wharf Tower Acquisition",
+    "city": "London",
+    "country": "UK",
+    "floors": 8,
+    "potential_rooms": 60,
+    "total_acquisition_cost": "4500000.00",
+    "syndication_target": "1500000.00",
+    "syndication_raised": "350000.00",
+    "expected_cap_rate_pct": "6.50",
+    "projected_annual_yield_pct": "14.20",
+    "status": "STRUCTURING",
+    "timeline": "Q3 2026"
+  }
+
+
+================================================================================
+  15. SUPPLY PRODUCTS
+================================================================================
+
+Base Path: /api/v1/global-real-estate/supply-products/
+
+Methods: GET, POST, PUT, PATCH, DELETE (Full ModelViewSet)
+Lookup Field: sku (not UUID)
+
+LIST
+────
+  GET /api/v1/global-real-estate/supply-products/
+
+  Query Parameters (Filters):
+    ?status=IN_STOCK
+    ?category=Cleaning Supplies
+
+  Search:
+    ?search=SKU-001            — Searches: sku, name
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "sku": "SKU-001",
+    "name": "Industrial Floor Cleaner 5L",
+    "category": "Cleaning Supplies",
+    "unit_price": "12.50",
+    "in_stock": 45,
+    "reorder_point": 10,
+    "status": "IN_STOCK"
+  }
+
+CUSTOM ACTION: Restock Product
+──────────────────────────────
+  POST /api/v1/global-real-estate/supply-products/{sku}/restock/
+
+  Request Body:
+  {
+    "quantity": 50
+  }
+
+  Description: Adds the specified quantity to the product's stock and sets status to IN_STOCK.
+  Response: Updated SupplyProduct object
+
+
+================================================================================
+  16. COMPLIANCE AUDITS (READ-ONLY)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/compliance-audits/
+
+Methods: GET only (ReadOnlyModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/compliance-audits/
+
+  Query Parameters (Filters):
+    ?status=COMPLIANT
+    ?jurisdiction=Germany
+
+  Search:
+    ?search=fire safety        — Searches: property_uid, regulation_type, legal_counsel
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "property_uid": "GLB-FFM-BLD1",
+    "jurisdiction": "Germany",
+    "regulation_type": "Fire Safety (DIN 14675)",
+    "status": "COMPLIANT",
+    "next_audit_date": "2026-06-15",
+    "legal_counsel": "Baker McKenzie Frankfurt",
+    "notes": "Passed all fire inspection requirements."
+  }
+
+
+================================================================================
+  17. EXPANSION HUB KPIs (READ-ONLY)
+================================================================================
+
+Base Path: /api/v1/global-real-estate/expansion-hubs/
+
+Methods: GET only (ReadOnlyModelViewSet)
+
+LIST
+────
+  GET /api/v1/global-real-estate/expansion-hubs/
+
+  Query Parameters (Filters):
+    ?country=Germany
+    ?region=DACH
+    ?growth_potential=HIGH
+
+  Search:
+    ?search=Frankfurt          — Searches: city, country
+
+  Response Body (each item):
+  {
+    "id": "uuid",
+    "city": "Frankfurt",
+    "country": "Germany",
+    "region": "DACH",
+    "active_properties": 3,
+    "total_beds": 36,
+    "occupancy_rate_pct": "92.50",
+    "monthly_revenue_eur": "12960.00",
+    "expansion_target_beds": 100,
+    "growth_potential": "HIGH"
+  }
+
+
+================================================================================
+  COMMON NOTES
+================================================================================
+
+  • Authentication: All endpoints use AllowAny (public access).
+  • Primary Keys: UUID v4 format (except supply-products which use SKU as lookup).
+  • Pagination: DRF default pagination applies.
+  • Content-Type: application/json
+  • Date Format: ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
+  • All ViewSets support the DRF browsable API at each endpoint URL.
+  • DefaultRouter auto-generates API root index at /api/v1/global-real-estate/
+
+  Status Choices Reference:
+    Master Lease: ACTIVE, PENDING, RENEWAL_DUE, EXPIRED
+    Room Types: Private Ensuite, Co-Living Studio, Master Suite, Micro-Pod Suite
+    Option Types: OPTION_A (Standard Market Lease), OPTION_B (Micro-Investor Discounted)
+    Duty Roster: PENDING, SUBMITTED_FOR_REVIEW, APPROVED, REJECTED_PENALIZED
+    Currencies: EUR, USD, GBP, AED, SGD, JPY
+
+================================================================================
+  END OF GLOBAL REAL ESTATE API DOCUMENTATION
+================================================================================

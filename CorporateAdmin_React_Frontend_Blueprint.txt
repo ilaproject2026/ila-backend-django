@@ -1,0 +1,1208 @@
+================================================================================
+CORPORATE ADMIN (COMMAND CENTER) - REACT FRONTEND INTEGRATION BLUEPRINT
+Production Architecture Specification: Vite + React 18+ + TypeScript + Axios
+Backend System: Django REST Framework (DRF) - Applications.CorporateAdmin
+Namespace: /api/v1/corporate-admin/ and /api/v1/
+Generated: 2026-09-08
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. ARCHITECTURAL OVERVIEW & FRONTEND DIRECTORY STRUCTURE
+2. ENVIRONMENT CONFIGURATION (.env)
+3. HTTP CLIENT & AUTOMATIC JWT REFRESH INTERCEPTOR (AXIOS)
+4. TYPESCRIPT DATA CONTRACTS & INTERFACES (types/corporateAdmin.ts)
+5. MODULAR API SERVICES REPOSITORY (services/api/)
+   5.1. Authentication Service (authService.ts)
+   5.2. Executive Dashboard & Analytics Service (dashboardService.ts)
+   5.3. Organization & Branches Service (organizationService.ts)
+   5.4. Employees & Management Service (employeeService.ts)
+   5.5. CRM & Sales Pipeline Service (crmService.ts)
+   5.6. Recruitment & ATS Service (recruitmentService.ts)
+   5.7. Tasks & Operations Service (taskService.ts)
+   5.8. Approvals Engine Service (approvalService.ts)
+   5.9. Finance & Marketing Service (financeService.ts)
+   5.10. Notifications & Audit Service (notificationService.ts)
+6. REACT HOOKS & STATE INTEGRATION (TanStack Query / Custom Hooks)
+7. AUTHENTICATION CONTEXT & SESSION PERSISTENCE (AuthContext.tsx)
+8. STEP-BY-STEP SUPABASE TO DRF MIGRATION ROADMAP
+
+================================================================================
+1. ARCHITECTURAL OVERVIEW & FRONTEND DIRECTORY STRUCTURE
+================================================================================
+The frontend application connects to Django REST Framework (DRF) using a centralized
+Axios HTTP client with automatic JWT token rotation, structured error normalization,
+and TypeScript contracts mirroring the backend serializers.
+
+Target Frontend File Tree:
+--------------------------
+src/
+├── api/ (or services/api/)
+│   ├── client.ts                 # Axios instance with Bearer interceptors & 401 retry queue
+│   ├── endpoints.ts              # Constant API URL path definitions
+│   ├── authService.ts            # Login, Refresh, Current User, Role Switch
+│   ├── dashboardService.ts       # Executive KPI metrics, stream, reports
+│   ├── organizationService.ts    # Organizations, Branches, Departments, Teams
+│   ├── employeeService.ts       # Staff directory, creation, reporting hierarchy
+│   ├── crmService.ts             # Inquiries, Leads, Opportunities, pipeline stage actions
+│   ├── recruitmentService.ts     # Candidates, Interviews, Onboarding steps & sign-offs
+│   ├── taskService.ts            # Tasks, assignment, priority, real-time comments
+│   ├── approvalService.ts        # Approval workflows, Approve / Reject / Cancel actions
+│   ├── financeService.ts         # Expenses, Budget summary, Marketing campaigns
+│   └── notificationService.ts    # User notifications & read status
+├── context/
+│   └── AuthContext.tsx           # Global user authentication, active role, permissions
+├── hooks/
+│   ├── useDashboard.ts           # React Query hook for executive KPI dashboard
+│   ├── useEmployees.ts           # Staff search and filter hook
+│   ├── useApprovals.ts           # Approvals queue and decision actions
+│   └── useTasks.ts               # Operations task management
+├── types/
+│   └── corporateAdmin.ts         # TypeScript interfaces 1:1 with DRF serializers
+└── .env                          # Local environment variable configuration
+
+================================================================================
+2. ENVIRONMENT CONFIGURATION (.env)
+================================================================================
+
+Create or update `.env` in the root of your React/Vite project:
+
+```env
+# Local Development Backend API
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+
+# Staging / Production Backend API
+# VITE_API_BASE_URL=https://api.command.ila-enterprise.com/api/v1
+
+# Request Timeout (ms)
+VITE_API_TIMEOUT=15000
+```
+
+================================================================================
+3. HTTP CLIENT & AUTOMATIC JWT REFRESH INTERCEPTOR (src/services/api/client.ts)
+================================================================================
+
+This module handles:
+1. Base URL configuration and JSON header defaults.
+2. Automatic Bearer token injection on every outgoing request.
+3. Transparent 401 detection, token refreshing with queued retry requests.
+4. Clean session purge and redirect to login when refresh fails.
+
+```typescript
+// src/services/api/client.ts
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+
+export const apiClient = axios.create({
+  baseURL: BASE_URL,
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 15000,
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
+
+// Storage Keys
+const ACCESS_TOKEN_KEY = 'corporate_admin_access_token';
+const REFRESH_TOKEN_KEY = 'corporate_admin_refresh_token';
+
+export const tokenStorage = {
+  getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
+  getRefreshToken: () => localStorage.getItem(REFRESH_TOKEN_KEY),
+  setTokens: (access: string, refresh: string) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, access);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+  },
+  clearTokens: () => {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  },
+};
+
+// Request Interceptor: Attach Bearer Token
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = tokenStorage.getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response Interceptor: Seamless Token Refresh Queue
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: AxiosError | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Prevent retry loops on login or refresh endpoint failures
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login/') &&
+      !originalRequest.url?.includes('/auth/refresh/')
+    ) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
+            return apiClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = tokenStorage.getRefreshToken();
+      if (!refreshToken) {
+        tokenStorage.clearTokens();
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+        return Promise.reject(error);
+      }
+
+      try {
+        const { data } = await axios.post(`${BASE_URL}/auth/refresh/`, {
+          refresh: refreshToken,
+        });
+
+        const newAccessToken = data.access;
+        const newRefreshToken = data.refresh || refreshToken;
+        tokenStorage.setTokens(newAccessToken, newRefreshToken);
+
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
+        processQueue(null, newAccessToken);
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError as AxiosError, null);
+        tokenStorage.clearTokens();
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+```
+
+================================================================================
+4. TYPESCRIPT DATA CONTRACTS (src/types/corporateAdmin.ts)
+================================================================================
+
+```typescript
+// src/types/corporateAdmin.ts
+
+export type EntityStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+export type BranchStatus = 'ACTIVE' | 'INACTIVE';
+
+export type RoleCode =
+  | 'SUPER_ADMIN'
+  | 'CEO'
+  | 'GENERAL_MANAGER'
+  | 'HR_ADMIN'
+  | 'HR_MANAGER'
+  | 'HR_EXECUTIVE'
+  | 'OPERATIONS_MANAGER'
+  | 'OPERATIONS_EXECUTIVE'
+  | 'FINANCE_MANAGER'
+  | 'FINANCE_EXECUTIVE'
+  | 'MARKETING_MANAGER'
+  | 'MARKETING_EXECUTIVE'
+  | 'SALES_MANAGER'
+  | 'SALES_EXECUTIVE'
+  | 'TEAM_LEAD'
+  | 'STAFF'
+  | 'EMPLOYEE';
+
+export type InquiryPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type InquiryStatus =
+  | 'NEW'
+  | 'CONTACTED'
+  | 'QUALIFIED'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'FOLLOW_UP'
+  | 'CONVERTED'
+  | 'LOST'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+export type OpportunityStage = 'QUALIFICATION' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST';
+export type CandidateStage =
+  | 'APPLICATION'
+  | 'SCREENING'
+  | 'INTERVIEW'
+  | 'SELECTED'
+  | 'OFFER'
+  | 'APPROVED'
+  | 'ONBOARDING'
+  | 'EMPLOYEE'
+  | 'REJECTED';
+
+export type TaskStatus = 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'WAITING' | 'COMPLETED' | 'OVERDUE' | 'CANCELLED';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export type ApprovalType =
+  | 'LEAVE'
+  | 'EXPENSE'
+  | 'ONBOARDING'
+  | 'RECRUITMENT'
+  | 'EQUIPMENT'
+  | 'DEPARTMENT_REQUEST'
+  | 'OPERATIONAL';
+
+// Organization & Structure
+export interface Organization {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  logo_url?: string;
+  status: EntityStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Branch {
+  id: string;
+  organization: string;
+  organization_name?: string;
+  name: string;
+  code: string;
+  location: string;
+  status: BranchStatus;
+  created_at: string;
+}
+
+export interface Department {
+  id: string;
+  organization: string;
+  organization_name?: string;
+  name: string;
+  code: string;
+  description?: string;
+  department_head?: EmployeeCompact | null;
+  budget: string | number;
+  status: BranchStatus;
+  employee_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Team {
+  id: string;
+  department: string;
+  department_name?: string;
+  name: string;
+  description?: string;
+  team_lead?: EmployeeCompact | null;
+  status: BranchStatus;
+  members_count?: number;
+  created_at: string;
+}
+
+// Staff & Employees
+export interface EmployeeCompact {
+  id: string;
+  employee_code: string;
+  full_name: string;
+  email: string;
+  avatar_url?: string;
+  designation: string;
+  role_name?: string;
+  department_name?: string;
+}
+
+export interface Employee {
+  id: string;
+  organization: string;
+  organization_name?: string;
+  employee_code: string;
+  full_name: string;
+  email: string;
+  avatar_url?: string;
+  designation: string;
+  department?: Department;
+  team?: Team;
+  role?: { id: string; name: RoleCode; display_name: string; level: number };
+  manager?: EmployeeCompact | null;
+  joining_date: string;
+  employment_type: string;
+  employment_status: string;
+  salary: string | number;
+  created_at: string;
+  updated_at: string;
+}
+
+// CRM & Deals
+export interface Inquiry {
+  id: string;
+  organization: string;
+  name: string;
+  email?: string;
+  phone: string;
+  source: string;
+  assigned_to?: string;
+  assigned_to_detail?: EmployeeCompact;
+  department?: string;
+  department_name?: string;
+  priority: InquiryPriority;
+  status: InquiryStatus;
+  notes?: string;
+  follow_up_date?: string;
+  created_at: string;
+}
+
+export interface Lead {
+  id: string;
+  organization: string;
+  name: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  source: string;
+  assigned_to?: string;
+  assigned_to_detail?: EmployeeCompact;
+  department?: string;
+  department_name?: string;
+  interested_product?: string;
+  estimated_value: string | number;
+  priority: InquiryPriority;
+  status: LeadStatus;
+  notes?: string;
+  follow_up_date?: string;
+  created_at: string;
+}
+
+export interface Opportunity {
+  id: string;
+  organization: string;
+  lead?: string;
+  lead_name?: string;
+  lead_company?: string;
+  title: string;
+  value: string | number;
+  stage: OpportunityStage;
+  assigned_to?: string;
+  assigned_to_detail?: EmployeeCompact;
+  probability: number;
+  close_date?: string;
+  created_at: string;
+}
+
+// Recruitment & Onboarding
+export interface Candidate {
+  id: string;
+  organization: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  position: string;
+  department?: string;
+  department_name?: string;
+  resume_url?: string;
+  source: string;
+  assigned_recruiter?: string;
+  recruiter_detail?: EmployeeCompact;
+  stage: CandidateStage;
+  interview_status: string;
+  interview_date?: string;
+  evaluation: Record<string, any>;
+  expected_salary?: string | number;
+  notes?: string;
+  application_date: string;
+}
+
+export interface OnboardingChecklistItem {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Onboarding {
+  id: string;
+  organization: string;
+  candidate?: string;
+  candidate_name?: string;
+  employee?: string;
+  employee_name?: string;
+  department?: string;
+  department_name?: string;
+  manager_detail?: EmployeeCompact;
+  status: string;
+  current_step: string;
+  progress: number;
+  documentation_status: string;
+  approval_status: string;
+  checklist: OnboardingChecklistItem[];
+  notes?: string;
+  created_at: string;
+}
+
+// Tasks & Operations
+export interface TaskComment {
+  id: string;
+  task: string;
+  author: string;
+  author_name: string;
+  author_avatar?: string;
+  comment: string;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  organization: string;
+  title: string;
+  description?: string;
+  created_by_detail?: EmployeeCompact;
+  assigned_to?: string;
+  assigned_to_detail?: EmployeeCompact;
+  department?: string;
+  department_name?: string;
+  team_name?: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  due_date?: string;
+  completed_at?: string;
+  comments: TaskComment[];
+  created_at: string;
+}
+
+// Approvals & Finance
+export interface Approval {
+  id: string;
+  organization: string;
+  requester?: string;
+  requester_detail?: EmployeeCompact;
+  approver?: string;
+  approver_detail?: EmployeeCompact;
+  request_type: ApprovalType;
+  related_entity?: string;
+  related_entity_id?: string;
+  amount: string | number;
+  status: ApprovalStatus;
+  comment?: string;
+  justification?: string;
+  decided_at?: string;
+  created_at: string;
+}
+
+export interface Expense {
+  id: string;
+  organization: string;
+  department?: string;
+  department_name?: string;
+  requester_detail?: EmployeeCompact;
+  title: string;
+  category: string;
+  amount: string | number;
+  date: string;
+  status: string;
+  approval?: string;
+  created_at: string;
+}
+
+export interface Campaign {
+  id: string;
+  organization: string;
+  name: string;
+  description?: string;
+  status: string;
+  budget: string | number;
+  spent: string | number;
+  leads_generated: number;
+  start_date: string;
+  end_date?: string;
+}
+
+// Notifications & Audit
+export interface Notification {
+  id: string;
+  user: string;
+  user_name?: string;
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  organization: string;
+  action: string;
+  module: string;
+  entity_type: string;
+  entity_id?: string;
+  user_name?: string;
+  old_data?: Record<string, any>;
+  new_data?: Record<string, any>;
+  created_at: string;
+}
+
+// Executive Dashboard Aggregation Response
+export interface DashboardMetrics {
+  total_employees: number;
+  active_leads: number;
+  pipeline_valuation: number;
+  pending_approvals: number;
+  open_tasks: number;
+  monthly_burn: number;
+}
+
+export interface DashboardPayload {
+  metrics: DashboardMetrics;
+  tasks_by_status: {
+    pending: number;
+    in_progress: number;
+    completed: number;
+    overdue: number;
+  };
+  leads_pipeline: Array<{
+    stage: string;
+    label: string;
+    count: number;
+    value: number;
+  }>;
+  recent_activities: Array<{
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    timestamp: string;
+    user: string;
+  }>;
+}
+```
+
+================================================================================
+5. MODULAR API SERVICES REPOSITORY
+================================================================================
+
+--------------------------------------------------------------------------------
+5.1. Authentication Service (`src/services/api/authService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient, { tokenStorage } from './client';
+import { Employee, RoleCode } from '../../types/corporateAdmin';
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access: string;
+  refresh: string;
+  user: {
+    id: string;
+    email: string;
+    profile: any;
+    employee?: Employee;
+    role: RoleCode;
+  };
+}
+
+export const authService = {
+  async login(credentials: LoginPayload): Promise<AuthResponse> {
+    const { data } = await apiClient.post<AuthResponse>('/auth/login/', credentials);
+    tokenStorage.setTokens(data.access, data.refresh);
+    return data;
+  },
+
+  async getCurrentUser() {
+    const { data } = await apiClient.get('/auth/me/');
+    return data;
+  },
+
+  async switchRole(role: RoleCode) {
+    const { data } = await apiClient.post('/auth/switch-role/', { role });
+    return data;
+  },
+
+  logout() {
+    tokenStorage.clearTokens();
+    window.location.href = '/login';
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.2. Executive Dashboard Service (`src/services/api/dashboardService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { DashboardPayload } from '../../types/corporateAdmin';
+
+export const dashboardService = {
+  async getDashboardData(): Promise<DashboardPayload> {
+    const { data } = await apiClient.get<DashboardPayload>('/corporate-admin/analytics/dashboard/');
+    return data;
+  },
+
+  async getActivityStream(limit = 25) {
+    const { data } = await apiClient.get('/corporate-admin/analytics/activity-stream/', {
+      params: { limit },
+    });
+    return data;
+  },
+
+  async getReports() {
+    const { data } = await apiClient.get('/corporate-admin/analytics/reports/');
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.3. Organization & Hierarchy Service (`src/services/api/organizationService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Organization, Branch, Department, Team } from '../../types/corporateAdmin';
+
+export const organizationService = {
+  async getCurrent(): Promise<Organization> {
+    const { data } = await apiClient.get<Organization>('/corporate-admin/organizations/current/');
+    return data;
+  },
+
+  async getBranches(): Promise<Branch[]> {
+    const { data } = await apiClient.get<Branch[]>('/corporate-admin/branches/');
+    return data;
+  },
+
+  async getDepartments(): Promise<Department[]> {
+    const { data } = await apiClient.get<Department[]>('/corporate-admin/departments/');
+    return data;
+  },
+
+  async getTeams(): Promise<Team[]> {
+    const { data } = await apiClient.get<Team[]>('/corporate-admin/teams/');
+    return data;
+  },
+
+  async createDepartment(payload: Partial<Department>): Promise<Department> {
+    const { data } = await apiClient.post<Department>('/corporate-admin/departments/', payload);
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.4. Employees & Management Service (`src/services/api/employeeService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Employee } from '../../types/corporateAdmin';
+
+export interface EmployeeFilters {
+  department?: string;
+  role?: string;
+  status?: string;
+}
+
+export const employeeService = {
+  async list(filters?: EmployeeFilters): Promise<Employee[]> {
+    const { data } = await apiClient.get<Employee[]>('/corporate-admin/employees/', {
+      params: filters,
+    });
+    return data;
+  },
+
+  async get(id: string): Promise<Employee> {
+    const { data } = await apiClient.get<Employee>(`/corporate-admin/employees/${id}/`);
+    return data;
+  },
+
+  async create(payload: Partial<Employee>): Promise<Employee> {
+    const { data } = await apiClient.post<Employee>('/corporate-admin/employees/', payload);
+    return data;
+  },
+
+  async update(id: string, payload: Partial<Employee>): Promise<Employee> {
+    const { data } = await apiClient.patch<Employee>(`/corporate-admin/employees/${id}/`, payload);
+    return data;
+  },
+
+  async getHierarchy(id: string) {
+    const { data } = await apiClient.get(`/corporate-admin/employees/${id}/hierarchy/`);
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.5. CRM & Sales Pipeline Service (`src/services/api/crmService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Inquiry, Lead, Opportunity, OpportunityStage } from '../../types/corporateAdmin';
+
+export const crmService = {
+  // Inquiries
+  async getInquiries(): Promise<Inquiry[]> {
+    const { data } = await apiClient.get<Inquiry[]>('/corporate-admin/inquiries/');
+    return data;
+  },
+
+  async createInquiry(payload: Partial<Inquiry>): Promise<Inquiry> {
+    const { data } = await apiClient.post<Inquiry>('/corporate-admin/inquiries/', payload);
+    return data;
+  },
+
+  async assignInquiry(id: string, employee_id: string): Promise<Inquiry> {
+    const { data } = await apiClient.post<Inquiry>(`/corporate-admin/inquiries/${id}/assign/`, {
+      employee_id,
+    });
+    return data;
+  },
+
+  // Leads
+  async getLeads(): Promise<Lead[]> {
+    const { data } = await apiClient.get<Lead[]>('/corporate-admin/leads/');
+    return data;
+  },
+
+  async createLead(payload: Partial<Lead>): Promise<Lead> {
+    const { data } = await apiClient.post<Lead>('/corporate-admin/leads/', payload);
+    return data;
+  },
+
+  async convertLead(leadId: string, oppTitle?: string, oppValue?: number) {
+    const { data } = await apiClient.post(`/corporate-admin/leads/${leadId}/convert/`, {
+      title: oppTitle,
+      value: oppValue,
+    });
+    return data;
+  },
+
+  // Opportunities
+  async getOpportunities(): Promise<Opportunity[]> {
+    const { data } = await apiClient.get<Opportunity[]>('/corporate-admin/opportunities/');
+    return data;
+  },
+
+  async updateOpportunityStage(id: string, stage: OpportunityStage): Promise<Opportunity> {
+    const { data } = await apiClient.post<Opportunity>(`/corporate-admin/opportunities/${id}/stage/`, {
+      stage,
+    });
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.6. Recruitment & ATS Service (`src/services/api/recruitmentService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Candidate, Onboarding, CandidateStage } from '../../types/corporateAdmin';
+
+export const recruitmentService = {
+  async getCandidates(stage?: CandidateStage): Promise<Candidate[]> {
+    const { data } = await apiClient.get<Candidate[]>('/corporate-admin/candidates/', {
+      params: { stage },
+    });
+    return data;
+  },
+
+  async createCandidate(payload: Partial<Candidate>): Promise<Candidate> {
+    const { data } = await apiClient.post<Candidate>('/corporate-admin/candidates/', payload);
+    return data;
+  },
+
+  async updateStage(candidateId: string, stage: CandidateStage): Promise<Candidate> {
+    const { data } = await apiClient.post<Candidate>(`/corporate-admin/candidates/${candidateId}/stage/`, {
+      stage,
+    });
+    return data;
+  },
+
+  async getOnboardings(): Promise<Onboarding[]> {
+    const { data } = await apiClient.get<Onboarding[]>('/corporate-admin/onboarding/');
+    return data;
+  },
+
+  async updateOnboardingStep(id: string, current_step: string, progress: number, checklist?: any) {
+    const { data } = await apiClient.post(`/corporate-admin/onboarding/${id}/step/`, {
+      current_step,
+      progress,
+      checklist,
+    });
+    return data;
+  },
+
+  async signOffOnboarding(id: string) {
+    const { data } = await apiClient.post(`/corporate-admin/onboarding/${id}/sign-off/`);
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.7. Tasks & Operations Service (`src/services/api/taskService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Task, TaskComment, TaskStatus } from '../../types/corporateAdmin';
+
+export const taskService = {
+  async getTasks(params?: { status?: TaskStatus; assigned_to?: string; department?: string }): Promise<Task[]> {
+    const { data } = await apiClient.get<Task[]>('/corporate-admin/tasks/', { params });
+    return data;
+  },
+
+  async createTask(payload: Partial<Task>): Promise<Task> {
+    const { data } = await apiClient.post<Task>('/corporate-admin/tasks/', payload);
+    return data;
+  },
+
+  async updateTask(id: string, payload: Partial<Task>): Promise<Task> {
+    const { data } = await apiClient.patch<Task>(`/corporate-admin/tasks/${id}/`, payload);
+    return data;
+  },
+
+  async getComments(taskId: string): Promise<TaskComment[]> {
+    const { data } = await apiClient.get<TaskComment[]>(`/corporate-admin/tasks/${taskId}/comments/`);
+    return data;
+  },
+
+  async addComment(taskId: string, comment: string): Promise<TaskComment> {
+    const { data } = await apiClient.post<TaskComment>(`/corporate-admin/tasks/${taskId}/comments/`, {
+      comment,
+    });
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.8. Approvals Engine Service (`src/services/api/approvalService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Approval } from '../../types/corporateAdmin';
+
+export const approvalService = {
+  async getApprovals(status?: string): Promise<Approval[]> {
+    const { data } = await apiClient.get<Approval[]>('/corporate-admin/approvals/', {
+      params: { status },
+    });
+    return data;
+  },
+
+  async submitApproval(payload: Partial<Approval>): Promise<Approval> {
+    const { data } = await apiClient.post<Approval>('/corporate-admin/approvals/', payload);
+    return data;
+  },
+
+  async takeAction(id: string, action: 'APPROVE' | 'REJECT' | 'CANCEL', comment?: string): Promise<Approval> {
+    const { data } = await apiClient.post<Approval>(`/corporate-admin/approvals/${id}/action/`, {
+      action,
+      comment,
+    });
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.9. Finance & Marketing Service (`src/services/api/financeService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Expense, Campaign } from '../../types/corporateAdmin';
+
+export const financeService = {
+  async getExpenses(): Promise<Expense[]> {
+    const { data } = await apiClient.get<Expense[]>('/corporate-admin/expenses/');
+    return data;
+  },
+
+  async submitExpense(payload: Partial<Expense>): Promise<Expense> {
+    const { data } = await apiClient.post<Expense>('/corporate-admin/expenses/', payload);
+    return data;
+  },
+
+  async getBudgetSummary() {
+    const { data } = await apiClient.get('/corporate-admin/finance/summary/');
+    return data;
+  },
+
+  async getCampaigns(): Promise<Campaign[]> {
+    const { data } = await apiClient.get<Campaign[]>('/corporate-admin/campaigns/');
+    return data;
+  },
+
+  async updateCampaignMetrics(id: string, spent: number, leads_generated: number) {
+    const { data } = await apiClient.post(`/corporate-admin/campaigns/${id}/metrics/`, {
+      spent,
+      leads_generated,
+    });
+    return data;
+  },
+};
+```
+
+--------------------------------------------------------------------------------
+5.10. Notifications Service (`src/services/api/notificationService.ts`)
+--------------------------------------------------------------------------------
+```typescript
+import apiClient from './client';
+import { Notification } from '../../types/corporateAdmin';
+
+export const notificationService = {
+  async getNotifications(): Promise<Notification[]> {
+    const { data } = await apiClient.get<Notification[]>('/corporate-admin/notifications/');
+    return data;
+  },
+
+  async markRead(id: string): Promise<Notification> {
+    const { data } = await apiClient.post<Notification>(`/corporate-admin/notifications/${id}/read/`);
+    return data;
+  },
+
+  async markAllRead() {
+    const { data } = await apiClient.post('/corporate-admin/notifications/mark-all-read/');
+    return data;
+  },
+};
+```
+
+================================================================================
+6. REACT HOOKS INTEGRATION (src/hooks/useDashboard.ts)
+================================================================================
+
+If using `@tanstack/react-query`:
+```typescript
+// src/hooks/useDashboard.ts
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../services/api/dashboardService';
+
+export function useCorporateDashboard() {
+  return useQuery({
+    queryKey: ['corporate-dashboard'],
+    queryFn: () => dashboardService.getDashboardData(),
+    refetchInterval: 30000, // auto-refresh every 30s
+    staleTime: 10000,
+  });
+}
+```
+
+Or using standard React `useEffect`:
+```typescript
+import { useState, useEffect } from 'react';
+import { dashboardService } from '../services/api/dashboardService';
+import { DashboardPayload } from '../types/corporateAdmin';
+
+export function useDashboardData() {
+  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    dashboardService
+      .getDashboardData()
+      .then((res) => {
+        if (mounted) {
+          setData(res);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          setError(err.message || 'Failed to fetch dashboard metrics');
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { data, loading, error };
+}
+```
+
+================================================================================
+7. AUTHENTICATION CONTEXT (src/context/AuthContext.tsx)
+================================================================================
+
+```tsx
+// src/context/AuthContext.tsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService, LoginPayload, AuthResponse } from '../services/api/authService';
+import { tokenStorage } from '../services/api/client';
+import { RoleCode } from '../types/corporateAdmin';
+
+interface AuthContextType {
+  user: AuthResponse['user'] | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (creds: LoginPayload) => Promise<void>;
+  logout: () => void;
+  switchRole: (role: RoleCode) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthResponse['user'] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = tokenStorage.getAccessToken();
+    if (token) {
+      authService
+        .getCurrentUser()
+        .then((userData) => {
+          setUser(userData);
+        })
+        .catch(() => {
+          tokenStorage.clearTokens();
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+
+    const handleExpired = () => {
+      setUser(null);
+    };
+    window.addEventListener('auth:expired', handleExpired);
+    return () => window.removeEventListener('auth:expired', handleExpired);
+  }, []);
+
+  const login = async (creds: LoginPayload) => {
+    const res = await authService.login(creds);
+    setUser(res.user);
+  };
+
+  const logout = () => {
+    authService.logout();
+    setUser(null);
+  };
+
+  const switchRole = async (role: RoleCode) => {
+    await authService.switchRole(role);
+    const updated = await authService.getCurrentUser();
+    setUser(updated);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        loading,
+        login,
+        logout,
+        switchRole,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
+```
+
+================================================================================
+8. STEP-BY-STEP SUPABASE TO DRF MIGRATION ROADMAP
+================================================================================
+
+Step 1: Install Axios
+---------------------
+In the frontend repository:
+  npm install axios
+
+Step 2: Add Environment Variables
+---------------------------------
+In `.env`:
+  VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+
+Step 3: Copy TypeScript Contracts & API Services
+------------------------------------------------
+1. Place contracts into `src/types/corporateAdmin.ts`.
+2. Create `src/services/api/client.ts` with the Bearer interceptor.
+3. Add modular services: `authService.ts`, `dashboardService.ts`, `employeeService.ts`, etc.
+
+Step 4: Update Existing React Pages / Components
+------------------------------------------------
+Replace old Supabase calls:
+```typescript
+// BEFORE (Supabase client):
+const { data, error } = await supabase.from('employees').select('*');
+
+// AFTER (DRF CorporateAdmin Service):
+const employees = await employeeService.list();
+```
+
+And for the executive KPI overview:
+```typescript
+// BEFORE:
+// Multiple separate queries to calculate burn, count tasks, etc.
+
+// AFTER (Unified DRF Aggregation Endpoint):
+const dashboard = await dashboardService.getDashboardData();
+// -> dashboard.metrics, dashboard.tasks_by_status, dashboard.leads_pipeline, dashboard.recent_activities
+```
+
+Step 5: Verify End-to-End
+-------------------------
+Run local dev server:
+  npm run dev
+
+Test login:
+  Email: marcus.vance@ila-command.com
+  Password: Admin@123456
+
+All cards on the command center will load from DRF with sub-second response time.
+================================================================================
+END OF BLUEPRINT
+================================================================================

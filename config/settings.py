@@ -42,12 +42,18 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'django_filters',
     'Applications',
     'Applications.ILA_WEB',
+    'Applications.BusinessStudio',
+    'Applications.ImportExport',
+    'Applications.GlobalRealEstate',
+    'Applications.CorporateAdmin',
     'drf_spectacular',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -132,9 +138,32 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # --- CORS Settings ---
-CORS_ALLOW_ALL_ORIGINS = True
-
+CORS_ALLOW_ALL_ORIGINS = False  # Use explicit whitelist below
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+    'http://localhost:5175',
+    'http://127.0.0.1:5175',
+    'http://localhost:5176',
+    'http://127.0.0.1:5176',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
+    'http://localhost:5175',
+    'http://127.0.0.1:5175',
+    'http://localhost:5176',
+    'http://127.0.0.1:5176',
+]
 
 
 # --- Django Rest Framework & JWT Settings ---
@@ -152,14 +181,14 @@ REST_FRAMEWORK = {
 }
 
 
-SESSION_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SECURE = True  # Set to True in production (HTTPS)
+SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+SESSION_COOKIE_SECURE = not DEBUG
 
-CSRF_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SECURE = True  # Set to True in production (HTTPS)
+CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+CSRF_COOKIE_SECURE = not DEBUG
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=6000),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
@@ -181,7 +210,7 @@ SIMPLE_JWT = {
 
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
-    'TOKEN_USER_CLASS': 'rest_framework.simplejwt.models.TokenUser',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
 
     'JTI_CLAIM': 'jti',
 
@@ -200,12 +229,22 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # --- Simple JWT Cookie Configuration ---
-SIMPLE_JWT_COOKIE_SECURE = True       # Must be True if SameSite='None'
-SIMPLE_JWT_COOKIE_SAMESITE = 'None'   # Set to 'None' in production with HTTPS if cross-site
+SIMPLE_JWT_COOKIE_SECURE = not DEBUG
+SIMPLE_JWT_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
 SIMPLE_JWT_COOKIE_HTTPONLY = True
 
 # --- Default primary key field type ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- drf_spectacular Configuration ---
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ILA Global API',
+    'DESCRIPTION': 'ILA Global Enterprise Backend API',
+    'VERSION': '1.0.0',
+    'EXTENSIONS': [
+        'Applications.schema_extensions',
+    ],
+}
 
 EMAIL_BACKEND = dtconfig('EMAIL_BACKEND')
 EMAIL_HOST = dtconfig('EMAIL_HOST')
@@ -217,3 +256,6 @@ DEFAULT_FROM_EMAIL = dtconfig('DEFAULT_FROM_EMAIL')
 
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
+GEMINI_API_KEY = dtconfig('GEMINI_API_KEY')

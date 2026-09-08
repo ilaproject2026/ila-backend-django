@@ -1,0 +1,239 @@
+================================================================================
+CORPORATE ADMIN (COMMAND CENTER) BACKEND API DOCUMENTATION
+System: ILA Admin / GEG Global Corporate Command Center
+App: Applications.CorporateAdmin
+Namespace Prefix: /api/v1/corporate-admin/ and /api/v1/
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. ARCHITECTURE & MULTI-TENANCY OVERVIEW
+2. AUTHENTICATION & IAM ENDPOINTS
+3. ORGANIZATION HIERARCHY ENDPOINTS
+4. EMPLOYEES & MANAGEMENT ENDPOINTS
+5. CRM & FRONT OFFICE PIPELINE ENDPOINTS
+6. RECRUITMENT & ONBOARDING ENDPOINTS
+7. TASKS & WORKFLOW ENDPOINTS
+8. APPROVALS ENGINE ENDPOINTS
+9. FINANCE & MARKETING ENDPOINTS
+10. NOTIFICATIONS & AUDIT LOGS ENDPOINTS
+11. EXECUTIVE DASHBOARD & ANALYTICS AGGREGATIONS
+12. SEEDING & MANAGEMENT COMMANDS
+
+================================================================================
+1. ARCHITECTURE & MULTI-TENANCY OVERVIEW
+================================================================================
+- Primary Keys: UUIDv4 across all models.
+- Timestamps: UTC `created_at` and `updated_at`.
+- Multi-Tenancy: Scoped to `Organization` via `TenantScopedModel` and `TenantScopedViewSetMixin`.
+- Dual Serializer Pattern: Read serializers return deep nested hierarchies (with `select_related`),
+  Write serializers accept foreign key identifiers.
+
+================================================================================
+2. AUTHENTICATION & IAM ENDPOINTS
+================================================================================
+POST   /api/v1/auth/login/
+  Request Payload:
+  {
+    "email": "marcus.vance@ila-command.com",
+    "password": "Admin@123456"
+  }
+  Response:
+  {
+    "access": "<jwt_access_token>",
+    "refresh": "<jwt_refresh_token>",
+    "user": {
+      "id": "<user_uuid>",
+      "email": "marcus.vance@ila-command.com",
+      "profile": { ... },
+      "employee": { ... },
+      "role": "CEO"
+    }
+  }
+
+POST   /api/v1/auth/refresh/
+  Request Payload:
+  {
+    "refresh": "<jwt_refresh_token>"
+  }
+
+GET    /api/v1/auth/me/
+  Response: Returns active user profile, linked employee profile, role code, and permission matrix.
+
+POST   /api/v1/auth/switch-role/
+  Request Payload:
+  {
+    "role": "HR_MANAGER"
+  }
+
+================================================================================
+3. ORGANIZATION HIERARCHY ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/organizations/current/
+  Returns current organization details, metadata, logo, and active status.
+
+GET    /api/v1/corporate-admin/branches/
+POST   /api/v1/corporate-admin/branches/
+  Payload: { "name": "Singapore Innovation Hub", "code": "APAC-SG", "location": "Marina Bay" }
+
+GET    /api/v1/corporate-admin/departments/
+POST   /api/v1/corporate-admin/departments/
+GET    /api/v1/corporate-admin/departments/{id}/
+PATCH  /api/v1/corporate-admin/departments/{id}/
+DELETE /api/v1/corporate-admin/departments/{id}/
+
+GET    /api/v1/corporate-admin/teams/
+POST   /api/v1/corporate-admin/teams/
+
+================================================================================
+4. EMPLOYEES & MANAGEMENT ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/employees/
+  Query Parameters: ?department=<uuid>&role=<RoleCode>&status=ACTIVE
+
+POST   /api/v1/corporate-admin/employees/
+  Payload:
+  {
+    "employee_code": "EMP-007",
+    "full_name": "Elena Rostova",
+    "email": "elena.rostova@ila-command.com",
+    "designation": "Head of Global Sales",
+    "department": "<dept_uuid>",
+    "role": "<role_uuid>",
+    "salary": "16000.00"
+  }
+
+GET    /api/v1/corporate-admin/employees/{id}/
+PATCH  /api/v1/corporate-admin/employees/{id}/
+
+GET    /api/v1/corporate-admin/employees/{id}/hierarchy/
+  Returns direct reports, manager profile, and reporting line depth.
+
+================================================================================
+5. CRM & FRONT OFFICE PIPELINE ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/inquiries/
+POST   /api/v1/corporate-admin/inquiries/
+PATCH  /api/v1/corporate-admin/inquiries/{id}/
+POST   /api/v1/corporate-admin/inquiries/{id}/assign/
+  Payload: { "employee_id": "<employee_uuid>" }
+
+GET    /api/v1/corporate-admin/leads/
+POST   /api/v1/corporate-admin/leads/
+PATCH  /api/v1/corporate-admin/leads/{id}/
+POST   /api/v1/corporate-admin/leads/{id}/convert/
+  Converts qualified lead into an Opportunity and returns deal record.
+
+GET    /api/v1/corporate-admin/opportunities/
+POST   /api/v1/corporate-admin/opportunities/
+PATCH  /api/v1/corporate-admin/opportunities/{id}/stage/
+  Payload: { "stage": "PROPOSAL" }
+
+================================================================================
+6. RECRUITMENT & ONBOARDING ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/candidates/
+POST   /api/v1/corporate-admin/candidates/
+PATCH  /api/v1/corporate-admin/candidates/{id}/
+POST   /api/v1/corporate-admin/candidates/{id}/stage/
+  Payload: { "stage": "ONBOARDING" }
+  Auto-generates onboarding checklist case when stage moves to ONBOARDING.
+
+GET    /api/v1/corporate-admin/onboarding/
+PATCH  /api/v1/corporate-admin/onboarding/{id}/step/
+  Payload: { "current_step": "EQUIPMENT_PROVISIONING", "progress": 65, "checklist": [...] }
+
+POST   /api/v1/corporate-admin/onboarding/{id}/sign-off/
+  Marks onboarding complete (100%) and sets approval status to APPROVED.
+
+================================================================================
+7. TASKS & WORKFLOW ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/tasks/
+  Query Parameters: ?assigned_to=<uuid>&department=<uuid>&status=IN_PROGRESS
+
+POST   /api/v1/corporate-admin/tasks/
+GET    /api/v1/corporate-admin/tasks/{id}/
+PATCH  /api/v1/corporate-admin/tasks/{id}/
+
+GET    /api/v1/corporate-admin/tasks/{id}/comments/
+POST   /api/v1/corporate-admin/tasks/{id}/comments/
+  Payload: { "comment": "First draft of ledger reconciliation is ready." }
+
+================================================================================
+8. APPROVALS ENGINE ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/approvals/
+POST   /api/v1/corporate-admin/approvals/
+  Payload:
+  {
+    "request_type": "EXPENSE",
+    "amount": "4800.00",
+    "justification": "International client travel & delegation hospitality."
+  }
+
+POST   /api/v1/corporate-admin/approvals/{id}/action/
+  Payload: { "action": "APPROVE", "comment": "Approved by board" }
+  Supported actions: APPROVE, REJECT, CANCEL.
+
+================================================================================
+9. FINANCE & MARKETING ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/expenses/
+POST   /api/v1/corporate-admin/expenses/
+
+GET    /api/v1/corporate-admin/finance/summary/
+  Returns total budget, total spent, utilization percentage, and breakdown per department.
+
+GET    /api/v1/corporate-admin/campaigns/
+POST   /api/v1/corporate-admin/campaigns/
+PATCH  /api/v1/corporate-admin/campaigns/{id}/metrics/
+  Payload: { "spent": "32400.00", "leads_generated": 142 }
+
+================================================================================
+10. NOTIFICATIONS & AUDIT LOGS ENDPOINTS
+================================================================================
+GET    /api/v1/corporate-admin/notifications/
+PATCH  /api/v1/corporate-admin/notifications/{id}/read/
+POST   /api/v1/corporate-admin/notifications/mark-all-read/
+
+GET    /api/v1/corporate-admin/audit/logs/
+  Paginated immutable audit log trail.
+
+================================================================================
+11. EXECUTIVE DASHBOARD & ANALYTICS AGGREGATIONS
+================================================================================
+GET    /api/v1/corporate-admin/analytics/dashboard/
+(Also available directly at /api/v1/analytics/dashboard/)
+  Consolidated single HTTP request returning:
+  {
+    "metrics": {
+      "total_employees": 6,
+      "active_leads": 1,
+      "pipeline_valuation": 1500000.00,
+      "pending_approvals": 1,
+      "open_tasks": 1,
+      "monthly_burn": 24500.00
+    },
+    "tasks_by_status": {
+      "pending": 0,
+      "in_progress": 1,
+      "completed": 0,
+      "overdue": 0
+    },
+    "leads_pipeline": [ ... ],
+    "recent_activities": [ ... ]
+  }
+
+GET    /api/v1/corporate-admin/analytics/activity-stream/
+GET    /api/v1/corporate-admin/analytics/reports/
+
+================================================================================
+12. SEEDING & MANAGEMENT COMMANDS
+================================================================================
+To seed demo enterprise data:
+  python manage.py seed_command_center_data
+
+To run unit tests:
+  python manage.py test Applications.CorporateAdmin
+================================================================================
