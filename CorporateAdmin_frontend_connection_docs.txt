@@ -1,0 +1,371 @@
+================================================================================
+CORPORATE ADMIN (COMMAND CENTER) - FRONTEND CONNECTION & AREA MAPPING GUIDE
+Document: CorporateAdmin_frontend_connection_docs.txt
+Target Frontend: React 18+ (TypeScript / Vite / Axios / Tailwind / Lucide)
+Backend Base URL: /api/v1/corporate-admin/ and /api/v1/
+Generated: 2026-09-09
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. GLOBAL HTTP CLIENT & AUTHENTICATION PROTOCOL
+2. AREA 1: EXECUTIVE COMMAND CENTER & OVERVIEW DASHBOARD
+3. AREA 2: AUTHENTICATION, ACTIVE ROLE & RBAC GUARD
+4. AREA 3: ORGANIZATION, BRANCHES & DEPARTMENTS
+5. AREA 4: STAFF DIRECTORY & REPORTING HIERARCHY
+6. AREA 5: FRONT OFFICE & CRM DEALS PIPELINE
+7. AREA 6: RECRUITMENT ATS & INTERVIEW PIPELINE
+8. AREA 7: ONBOARDING WORKFLOW & CHECKLIST SIGN-OFF
+9. AREA 8: OPERATIONS TASKS & COMMENTS ENGINE
+10. AREA 9: MULTI-TIER APPROVALS WORKFLOW
+11. AREA 10: CORPORATE FINANCE & BUDGET SUMMARY
+12. AREA 11: MARKETING CAMPAIGNS & METRICS TRACKER
+13. AREA 12: REAL-TIME NOTIFICATIONS & AUDIT TRAILS
+
+================================================================================
+1. GLOBAL HTTP CLIENT & AUTHENTICATION PROTOCOL
+================================================================================
+
+Configure your Vite Axios client (`src/services/api/client.ts`):
+Base URL:
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+
+All authenticated requests automatically include the Bearer token in the header:
+  Authorization: Bearer <ACCESS_TOKEN>
+
+================================================================================
+2. AREA 1: EXECUTIVE COMMAND CENTER & OVERVIEW DASHBOARD
+================================================================================
+Corresponding Frontend Area:
+  File: `src/pages/Dashboard.tsx` or `src/components/dashboard/ExecutiveOverview.tsx`
+  Purpose: Displays all high-level KPI cards, task charts, deal pipeline, and activity feed in a single call.
+
+API Endpoint:
+  GET /api/v1/corporate-admin/analytics/dashboard/
+  (Also accessible at: GET /api/v1/analytics/dashboard/)
+
+Sample Backend Response:
+{
+  "metrics": {
+    "total_employees": 6,
+    "active_leads": 1,
+    "pipeline_valuation": 1500000.0,
+    "pending_approvals": 1,
+    "open_tasks": 1,
+    "monthly_burn": 24500.0
+  },
+  "tasks_by_status": {
+    "pending": 0,
+    "in_progress": 1,
+    "completed": 0,
+    "overdue": 0
+  },
+  "leads_pipeline": [
+    { "stage": "QUALIFICATION", "label": "Qualification", "count": 0, "value": 0.0 },
+    { "stage": "PROPOSAL", "label": "Proposal", "count": 1, "value": 1500000.0 },
+    { "stage": "NEGOTIATION", "label": "Negotiation", "count": 0, "value": 0.0 },
+    { "stage": "CLOSED_WON", "label": "Closed Won", "count": 0, "value": 0.0 },
+    { "stage": "CLOSED_LOST", "label": "Closed Lost", "count": 0, "value": 0.0 }
+  ],
+  "recent_activities": [
+    {
+      "id": "act-1",
+      "type": "CORE",
+      "title": "Organization Initialized",
+      "description": "Organization event recorded",
+      "timestamp": "2026-09-08T17:21:24.874239Z",
+      "user": "Marcus Vance"
+    }
+  ]
+}
+
+Frontend Area Hook Implementation:
+```typescript
+// src/hooks/useDashboard.ts
+import { useState, useEffect } from 'react';
+import apiClient from '../services/api/client';
+
+export function useDashboard() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.get('/corporate-admin/analytics/dashboard/')
+      .then(res => setData(res.data))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { data, loading };
+}
+```
+
+================================================================================
+3. AREA 2: AUTHENTICATION, ACTIVE ROLE & RBAC GUARD
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Login.tsx`, `src/context/AuthContext.tsx`, `src/components/layout/HeaderProfile.tsx`
+  Purpose: User authentication, JWT storage, role-switching, and permission matrix checking.
+
+API Endpoints:
+  1. POST /api/v1/corporate-admin/auth/login/
+     (Also at: POST /api/v1/auth/login/)
+     Request Payload:
+     {
+       "email": "marcus.vance@ila-command.com",
+       "password": "Admin@123456"
+     }
+     Response:
+     {
+       "access": "<jwt_token>",
+       "refresh": "<jwt_refresh_token>",
+       "user": { "id": "...", "email": "...", "role": "CEO", "employee": { ... } }
+     }
+
+  2. GET /api/v1/corporate-admin/auth/me/
+     (Also at: GET /api/v1/auth/me/)
+     Response:
+     {
+       "id": "c1f7b03b-...",
+       "email": "marcus.vance@ila-command.com",
+       "full_name": "Marcus Vance",
+       "role": "CEO",
+       "role_display": "Chief Executive Officer",
+       "department_name": "Executive Leadership",
+       "employee_code": "EMP-001",
+       "permissions": ["ANALYTICS:READ", "APPROVALS:WRITE", ...]
+     }
+
+  3. POST /api/v1/corporate-admin/auth/switch-role/
+     Request Payload:
+     {
+       "role": "HR_MANAGER"
+     }
+
+================================================================================
+4. AREA 3: ORGANIZATION, BRANCHES & DEPARTMENTS
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Organization.tsx`, `src/pages/Departments.tsx`, `src/components/modals/CreateDepartmentModal.tsx`
+  Purpose: Corporate entity structure, branch locations, department budgets, and team units.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/organizations/current/
+     Returns active organization metadata (name, code, logo).
+
+  2. GET /api/v1/corporate-admin/branches/
+     POST /api/v1/corporate-admin/branches/
+     Payload: { "name": "Singapore Innovation Hub", "code": "APAC-SG", "location": "Marina Bay" }
+
+  3. GET /api/v1/corporate-admin/departments/
+     POST /api/v1/corporate-admin/departments/
+     GET /api/v1/corporate-admin/departments/{id}/
+     PATCH /api/v1/corporate-admin/departments/{id}/
+     DELETE /api/v1/corporate-admin/departments/{id}/
+
+  4. GET /api/v1/corporate-admin/teams/
+     POST /api/v1/corporate-admin/teams/
+
+================================================================================
+5. AREA 4: STAFF DIRECTORY & REPORTING HIERARCHY
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Employees.tsx`, `src/components/employees/EmployeeCard.tsx`, `src/components/employees/HierarchyTree.tsx`
+  Purpose: Staff listing, management reporting lines, salary details, and department assignment.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/employees/
+     Query Filters:
+       ?department=<dept_id>
+       ?role=<RoleCode>
+       ?status=ACTIVE
+     Returns array of employees with nested profile, department, team, role, and manager.
+
+  2. POST /api/v1/corporate-admin/employees/
+     Payload:
+     {
+       "employee_code": "EMP-007",
+       "full_name": "Dr. Aris Thorne",
+       "email": "aris.thorne@ila-command.com",
+       "phone": "+971-50-7788990",
+       "designation": "Director of Technology",
+       "department": "<dept_uuid>",
+       "role": "<role_uuid>",
+       "manager": "<manager_employee_uuid>",
+       "salary": "22000.00"
+     }
+
+  3. GET /api/v1/corporate-admin/employees/{id}/hierarchy/
+     Returns:
+     {
+       "employee": { "id": "...", "full_name": "Marcus Vance", "designation": "CEO" },
+       "direct_reports_count": 4,
+       "direct_reports": [
+         { "id": "...", "full_name": "Sarah Connor", "designation": "VP Human Capital" },
+         { "id": "...", "full_name": "David Sterling", "designation": "CFO" }
+       ]
+     }
+
+================================================================================
+6. AREA 5: FRONT OFFICE & CRM DEALS PIPELINE
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/CRM.tsx`, `src/pages/Inquiries.tsx`, `src/pages/Leads.tsx`, `src/components/crm/DealsKanban.tsx`
+  Purpose: Front office walk-ins & web leads, assignment to sales agents, and conversion to opportunities.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/inquiries/
+     POST /api/v1/corporate-admin/inquiries/
+     POST /api/v1/corporate-admin/inquiries/{id}/assign/
+     Payload: { "employee_id": "<employee_uuid>" }
+
+  2. GET /api/v1/corporate-admin/leads/
+     POST /api/v1/corporate-admin/leads/
+     POST /api/v1/corporate-admin/leads/{id}/convert/
+     Converts a lead to a sales deal opportunity:
+     Payload (Optional): { "title": "Enterprise Logistics Escrow", "value": 1500000.00 }
+
+  3. GET /api/v1/corporate-admin/opportunities/
+     POST /api/v1/corporate-admin/opportunities/{id}/stage/
+     Moves deal across Kanban columns:
+     Payload: { "stage": "NEGOTIATION" } (Choices: QUALIFICATION, PROPOSAL, NEGOTIATION, CLOSED_WON, CLOSED_LOST)
+
+================================================================================
+7. AREA 6: RECRUITMENT ATS & INTERVIEW PIPELINE
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Recruitment.tsx`, `src/components/recruitment/CandidateKanban.tsx`
+  Purpose: Candidate applicant tracking (ATS), interview evaluations, and stage advancement.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/candidates/
+     Query Filter: ?stage=SCREENING
+  2. POST /api/v1/corporate-admin/candidates/
+  3. POST /api/v1/corporate-admin/candidates/{id}/stage/
+     Payload: { "stage": "ONBOARDING" }
+     *NOTE: Advancing stage to 'SELECTED' or 'ONBOARDING' automatically triggers the creation
+      of an Onboarding case in the Onboarding system with a standardized 4-step checklist.
+
+================================================================================
+8. AREA 7: ONBOARDING WORKFLOW & CHECKLIST SIGN-OFF
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Onboarding.tsx`, `src/components/onboarding/OnboardingStepper.tsx`
+  Purpose: Tracking document collection, hardware allocation, accounts setup, and final HR sign-off.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/onboarding/
+  2. POST /api/v1/corporate-admin/onboarding/{id}/step/
+     Payload:
+     {
+       "current_step": "HARDWARE_PROVISIONING",
+       "progress": 75,
+       "checklist": [
+         { "id": "1", "title": "Verify Credentials", "completed": true },
+         { "id": "2", "title": "Tax & Payroll Setup", "completed": true },
+         { "id": "3", "title": "Executive Sign-off", "completed": true },
+         { "id": "4", "title": "Hardware Provisioning", "completed": false }
+       ]
+     }
+
+  3. POST /api/v1/corporate-admin/onboarding/{id}/sign-off/
+     Payload: (Empty body)
+     *NOTE: Sets onboarding progress to 100%, status to 'COMPLETED', approval to 'APPROVED',
+      and automatically provisions a new active Employee and Profile record in the directory!
+
+================================================================================
+9. AREA 8: OPERATIONS TASKS & COMMENTS ENGINE
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Tasks.tsx`, `src/components/tasks/TaskDetailsDrawer.tsx`
+  Purpose: Task assignment, priority, due date tracking, and collaborative comments feed.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/tasks/
+     Query Filters: ?status=IN_PROGRESS&assigned_to=<id>&department=<id>
+  2. POST /api/v1/corporate-admin/tasks/
+  3. PATCH /api/v1/corporate-admin/tasks/{id}/
+     Payload: { "status": "COMPLETED" }
+  4. GET /api/v1/corporate-admin/tasks/{id}/comments/
+  5. POST /api/v1/corporate-admin/tasks/{id}/comments/
+     Payload: { "comment": "Q4 reconciliation complete and uploaded to auditor vault." }
+
+================================================================================
+10. AREA 9: MULTI-TIER APPROVALS WORKFLOW
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Approvals.tsx`, `src/components/approvals/ApprovalActionModal.tsx`
+  Purpose: Authorizing expenditure, leave requests, asset allocation, and departmental requisitions.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/approvals/
+     Query Filters: ?status=PENDING&request_type=EXPENSE
+  2. POST /api/v1/corporate-admin/approvals/
+     Payload:
+     {
+       "request_type": "EXPENSE",
+       "amount": "4800.00",
+       "justification": "International client delegation travel."
+     }
+  3. POST /api/v1/corporate-admin/approvals/{id}/action/
+     Payload:
+     {
+       "action": "APPROVE",   // Options: 'APPROVE', 'REJECT', 'CANCEL'
+       "comment": "Approved following finance review."
+     }
+
+================================================================================
+11. AREA 10: CORPORATE FINANCE & BUDGET SUMMARY
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Finance.tsx`, `src/components/finance/BudgetGauges.tsx`
+  Purpose: Tracking corporate department budgets vs incurred expenses and claims.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/expenses/
+  2. POST /api/v1/corporate-admin/expenses/
+     Payload: { "title": "Core Cloud Hosting", "amount": 24500.00, "category": "INFRASTRUCTURE", "department": "<dept_id>" }
+  3. GET /api/v1/corporate-admin/expenses/summary/
+     (Also at: GET /api/v1/corporate-admin/finance/summary/)
+     Response:
+     {
+       "total_budget": 3300000.0,
+       "total_spent": 24500.0,
+       "pending_amount": 0.0,
+       "utilization_pct": 0.74
+     }
+
+================================================================================
+12. AREA 11: MARKETING CAMPAIGNS & METRICS TRACKER
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/pages/Marketing.tsx`, `src/components/marketing/CampaignCard.tsx`
+  Purpose: Managing ad campaigns, budget burn, and inbound lead attribution.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/campaigns/
+  2. POST /api/v1/corporate-admin/campaigns/
+  3. POST /api/v1/corporate-admin/campaigns/{id}/metrics/
+     Payload:
+     {
+       "spent": 32400.00,
+       "leads_generated": 142
+     }
+
+================================================================================
+13. AREA 12: REAL-TIME NOTIFICATIONS & AUDIT TRAILS
+================================================================================
+Corresponding Frontend Area:
+  Files: `src/components/layout/NotificationsDropdown.tsx`, `src/pages/AuditLogs.tsx`
+  Purpose: Live notification badge, mark-as-read actions, and immutable compliance audit logs.
+
+API Endpoints:
+  1. GET /api/v1/corporate-admin/notifications/
+     Returns user-specific alerts sorted by `-created_at`.
+  2. POST /api/v1/corporate-admin/notifications/{id}/read/
+  3. POST /api/v1/corporate-admin/notifications/mark-all-read/
+  4. GET /api/v1/corporate-admin/audit/logs/
+     Paginated change-log entries storing action, module, entity_id, user_name, and data diffs.
+
+================================================================================
+END OF FRONTEND CONNECTION SPECIFICATION
+================================================================================

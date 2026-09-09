@@ -16,7 +16,7 @@ from .models import (
     Task, TaskComment, Approval, Expense, Campaign, Notification, AuditLog,
     EntityStatus, BranchStatus, RoleCode, InquiryStatus, LeadStatus,
     CandidateStage, OnboardingStatus, ApprovalStatus, TaskStatus,
-    ExpenseStatus, NotificationType, OpportunityStage
+    ExpenseStatus, NotificationType, OpportunityStage, DocumentationStatus
 )
 from .serializers import (
     OrganizationSerializer, BranchSerializer, DepartmentReadSerializer,
@@ -133,36 +133,41 @@ class CurrentUserView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        if not request.user.is_authenticated:
-            # Provide default acting identity for frictionless development
+        user = request.user
+        profile = None
+        employee = None
+
+        if user.is_authenticated:
+            profile = getattr(user, 'central_profile', None) or getattr(user, 'profile', None)
+            if not profile:
+                profile, _ = Profile.objects.get_or_create(
+                    user=user,
+                    defaults={'email': user.email, 'full_name': getattr(user, 'get_full_name', lambda: '')() or user.username}
+                )
+            employee = getattr(profile, 'employee', None)
+        else:
             employee = Employee.objects.select_related('profile', 'role', 'department', 'organization').first()
             if employee:
-                return Response({
-                    "authenticated": False,
-                    "profile": ProfileSerializer(employee.profile).data,
-                    "employee": EmployeeReadSerializer(employee).data,
-                    "role": employee.role.name if employee.role else "SUPER_ADMIN",
-                    "permissions": [f"{p.module}:{p.action}" for p in (employee.role.permissions.all() if employee.role else [])]
-                })
-            return Response({
-                "authenticated": False,
-                "message": "Anonymous session. Please authenticate."
-            })
+                profile = employee.profile
 
-        profile = getattr(request.user, 'central_profile', None)
-        if not profile:
-            profile, _ = Profile.objects.get_or_create(
-                user=request.user,
-                defaults={'email': request.user.email, 'full_name': request.user.username}
-            )
+        role_name = employee.role.name if employee and employee.role else ('SUPER_ADMIN' if not user.is_authenticated else 'EMPLOYEE')
+        role_display = employee.role.display_name if employee and employee.role else ('Super Administrator' if not user.is_authenticated else 'Employee')
+        dept_name = employee.department.name if employee and employee.department else None
+        emp_code = employee.employee_code if employee else None
 
-        employee = getattr(profile, 'employee', None)
         return Response({
-            "authenticated": True,
-            "profile": ProfileSerializer(profile).data,
-            "employee": EmployeeReadSerializer(employee).data if employee else None,
-            "role": employee.role.name if employee and employee.role else "STAFF",
-            "permissions": [f"{p.module}:{p.action}" for p in (employee.role.permissions.all() if employee and employee.role else [])]
+            'authenticated': bool(user.is_authenticated),
+            'id': str(profile.id) if profile else (str(user.id) if user.is_authenticated else None),
+            'email': profile.email if profile else (user.email if user.is_authenticated else 'admin@geg-enterprise.com'),
+            'full_name': profile.full_name if profile else (user.get_full_name() if user.is_authenticated else 'Command Center Admin'),
+            'avatar_url': profile.avatar_url if profile else None,
+            'role': role_name,
+            'role_display': role_display,
+            'department_name': dept_name,
+            'employee_code': emp_code,
+            'profile': ProfileSerializer(profile).data if profile else None,
+            'employee': EmployeeReadSerializer(employee).data if employee else None,
+            'permissions': [f"{p.module}:{p.action}" for p in (employee.role.permissions.all() if employee and employee.role else [])],
         })
 
 
@@ -425,9 +430,45 @@ class OnboardingViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         onboarding.status = OnboardingStatus.COMPLETED
         onboarding.progress = 100
         onboarding.approval_status = ApprovalStatus.APPROVED
+        onboarding.documentation_status = DocumentationStatus.VERIFIED
+        onboarding.checklist = [
+            {'id': item.get('id', str(idx)), 'title': item.get('title', ''), 'completed': True}
+            for idx, item in enumerate(onboarding.checklist or [])
+        ]
         onboarding.save()
+
+        # Automatically create active Profile and Employee if candidate exists and no employee linked
+        if onboarding.candidate and not onboarding.employee:
+            cand = onboarding.candidate
+            cand.stage = CandidateStage.EMPLOYEE
+            cand.save()
+
+            prof, _ = Profile.objects.get_or_create(
+                email=cand.email,
+                defaults={
+                    'full_name': cand.full_name,
+                    'phone': cand.phone,
+                    'status': EntityStatus.ACTIVE
+                }
+            )
+            role = Role.objects.filter(name=RoleCode.EMPLOYEE).first() or Role.objects.first()
+            emp = Employee.objects.create(
+                profile=prof,
+                organization=onboarding.organization,
+                department=onboarding.department,
+                role=role,
+                employee_code=f"EMP-{Employee.objects.count() + 1001}",
+                designation=cand.position,
+                joining_date=timezone.now().date(),
+                salary=cand.expected_salary or Decimal('85000.00')
+            )
+            onboarding.employee = emp
+            onboarding.save(update_fields=['employee'])
+
         return Response({
+            "status": "ONBOARDING_COMPLETED",
             "message": "Onboarding completed and signed off.",
+            "employee_id": str(onboarding.employee_id) if onboarding.employee_id else None,
             "onboarding": OnboardingReadSerializer(onboarding).data
         })
 
@@ -535,6 +576,19 @@ class ExpenseViewSet(TenantScopedViewSetMixin, viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             return ExpenseReadSerializer
         return ExpenseWriteSerializer
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        org = get_current_organization(request)
+        total_budget = Department.objects.filter(organization=org).aggregate(b=models.Sum('budget'))['b'] or Decimal('0.00')
+        total_spent = Expense.objects.filter(organization=org, status__in=[ExpenseStatus.APPROVED, ExpenseStatus.PAID]).aggregate(s=models.Sum('amount'))['s'] or Decimal('0.00')
+        pending = Expense.objects.filter(organization=org, status=ExpenseStatus.PENDING).aggregate(p=models.Sum('amount'))['p'] or Decimal('0.00')
+        return Response({
+            'total_budget': float(total_budget),
+            'total_spent': float(total_spent),
+            'pending_amount': float(pending),
+            'utilization_pct': round((float(total_spent) / float(total_budget) * 100), 2) if total_budget > 0 else 0
+        })
 
 
 class FinanceSummaryView(APIView):
@@ -764,3 +818,8 @@ class AnalyticsReportsView(APIView):
                 "total_deal_value": float(Opportunity.objects.filter(organization=org).aggregate(t=models.Sum('value'))['t'] or 0)
             }
         })
+
+
+# Alias matching Blueprint 2.0.0 section 4.12 naming
+ExecutiveDashboardAnalyticsView = AnalyticsDashboardView
+

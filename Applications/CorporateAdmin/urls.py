@@ -9,7 +9,8 @@ from .views import (
     CandidateViewSet, OnboardingViewSet, TaskViewSet, ApprovalViewSet,
     ExpenseViewSet, FinanceSummaryView, CampaignViewSet,
     NotificationViewSet, AuditLogViewSet,
-    AnalyticsDashboardView, AnalyticsActivityStreamView, AnalyticsReportsView
+    AnalyticsDashboardView, ExecutiveDashboardAnalyticsView,
+    AnalyticsActivityStreamView, AnalyticsReportsView
 )
 
 router = DefaultRouter()
@@ -32,18 +33,21 @@ router.register(r'audit/logs', AuditLogViewSet, basename='audit-log')
 
 urlpatterns = [
     # Auth endpoints
-    path('auth/login/', LoginView.as_view(), name='centelized-auth-login'),
-    path('auth/refresh/', TokenRefreshView.as_view(), name='centelized-auth-refresh'),
-    path('auth/me/', CurrentUserView.as_view(), name='centelized-auth-me'),
-    path('auth/switch-role/', SwitchRoleView.as_view(), name='centelized-auth-switch-role'),
+    path('auth/login/', LoginView.as_view(), name='corporate-auth-login'),
+    path('auth/refresh/', TokenRefreshView.as_view(), name='corporate-auth-refresh'),
+    path('auth/me/', CurrentUserView.as_view(), name='corporate-auth-me'),
+    path('auth/switch-role/', SwitchRoleView.as_view(), name='corporate-auth-switch-role'),
 
     # Finance summary
-    path('finance/summary/', FinanceSummaryView.as_view(), name='centelized-finance-summary'),
+    path('finance/summary/', FinanceSummaryView.as_view(), name='corporate-finance-summary'),
 
     # Analytics & Dashboard
-    path('analytics/dashboard/', AnalyticsDashboardView.as_view(), name='centelized-analytics-dashboard'),
-    path('analytics/activity-stream/', AnalyticsActivityStreamView.as_view(), name='centelized-analytics-activity-stream'),
-    path('analytics/reports/', AnalyticsReportsView.as_view(), name='centelized-analytics-reports'),
+    path('analytics/dashboard/', ExecutiveDashboardAnalyticsView.as_view(), name='corporate-analytics-dashboard'),
+    path('analytics/activity-stream/', AnalyticsActivityStreamView.as_view(), name='corporate-analytics-activity-stream'),
+    path('analytics/reports/', AnalyticsReportsView.as_view(), name='corporate-analytics-reports'),
+
+    # Backward compatibility alias for tests and prior blueprints
+    path('centelized/dashboard/', AnalyticsDashboardView.as_view(), name='centelized-analytics-dashboard'),
 
     # Router ViewSets
     path('', include(router.urls)),

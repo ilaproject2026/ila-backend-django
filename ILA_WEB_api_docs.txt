@@ -1,0 +1,886 @@
+================================================================================
+ILA ACADEMY CENTRAL BACKEND API DOCUMENTATION & FRONTEND CONNECTION BLUEPRINT
+================================================================================
+Target System: ILA Academy Global Web & Enterprise Portal (ILA_WEB)
+Backend Framework: Django 6.x + Django REST Framework (DRF) 3.15+
+Authentication Protocol: SimpleJWT Bearer Authentication + Cookie Fallback
+API Namespace: /api/v1/
+Generated: September 2026
+Target Frontend: React 18+ / Vite / TypeScript / Axios / Tailwind CSS
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. ARCHITECTURAL OVERVIEW & FRONTEND CLIENT SETUP
+2. MULTI-TIER RBAC & AUTHENTICATION ENDPOINTS
+3. OMNICHANNEL INQUIRY & INTAKE DESK (FRONT OFFICE & CRM)
+4. AI TIE-UP ENGINE & PARTNER INSTITUTION REGISTRY
+5. MARKETING STUDIO & CAMPAIGN MANAGEMENT
+6. REWARDS PROGRAM & JUNIOR CONSULTANT NETWORK
+7. WORK WHILE STUDY & AI PRELIMINARY INTERVIEWS
+8. DYNAMIC VISA REQUIREMENTS & SETTLEMENT SUPPORT
+9. CORE ENTERPRISE OPERATIONS (STAFF, TASKS, ATTENDANCE, APPROVALS, FRANCHISES)
+10. COMPLETE TYPESCRIPT DATA INTERFACES (FRONTEND CONTRACTS)
+11. READY-TO-USE REACT API CLIENT & HOOK EXAMPLES
+
+================================================================================
+1. ARCHITECTURAL OVERVIEW & FRONTEND CLIENT SETUP
+================================================================================
+
+Base URL Configuration:
+  Development: http://127.0.0.1:8000/api/v1
+  Production:  https://api.ilaglobal.edu/api/v1
+
+Frontend Environment Variable (.env):
+  VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+
+Global Headers Required:
+  Content-Type: application/json
+  Authorization: Bearer <ACCESS_TOKEN>
+  X-Biometric-Token: <PIN> (Optional: Used for biometric/security gate master override)
+
+Axios Client Configuration (`src/services/api/client.ts`):
+--------------------------------------------------------------------------------
+import axios from 'axios';
+
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ila_access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  const biometricPin = localStorage.getItem('ila_biometric_pin');
+  if (biometricPin) {
+    config.headers['X-Biometric-Token'] = biometricPin;
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refresh = localStorage.getItem('ila_refresh_token');
+      if (refresh) {
+        try {
+          const res = await axios.post(
+            `${apiClient.defaults.baseURL}/auth/token/refresh/`,
+            { refresh }
+          );
+          const newAccess = res.data.access;
+          localStorage.setItem('ila_access_token', newAccess);
+          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+          return apiClient(originalRequest);
+        } catch {
+          localStorage.removeItem('ila_access_token');
+          localStorage.removeItem('ila_refresh_token');
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+--------------------------------------------------------------------------------
+
+================================================================================
+2. MULTI-TIER RBAC & AUTHENTICATION ENDPOINTS
+================================================================================
+
+Available User Roles:
+  - Super Admin (Global Authority / Kuttan)
+  - CEO (Master CEO)
+  - General Manager (Operational Oversight)
+  - Academic HOD (Department Head - Education & All Courses)
+  - Study Abroad HOD (Department Head - Study Abroad Hub)
+  - Visa HOD (Department Head - Visa & Compliance)
+  - Work & Study HOD (Department Head - Work and Study Hub)
+  - Jobs HOD (Department Head - Jobs & Career Hub)
+  - HR Manager (HR Department Manager)
+  - Finance Officer (Finance & Accounts Officer)
+  - Marketing Exec (Marketing Studio Executive)
+  - Academic Counselor (Front Office Intake & Academic Counselor)
+  - Franchise Partner (Franchise Partner / Regional Territory Lead)
+  - student (Student / Candidate Enrollee)
+  - employer (Corporate Employer / Partner)
+
+--------------------------------------------------------------------------------
+2.1. User Registration & Dual Provisioning
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/register/
+Access: Public
+Notes: Creates user account AND automatically provisions their Junior Consultant
+       Rewards Club account with 100 welcome points.
+
+Request Payload:
+{
+  "email": "candidate@example.com",
+  "password": "SecurePassword2026!",
+  "full_name": "Siddharth Menon",
+  "phone": "+919876543210",
+  "role": "student",
+  "department": "Study Abroad"
+}
+
+Response (201 Created):
+{
+  "access": "<JWT_ACCESS_TOKEN>",
+  "refresh": "<JWT_REFRESH_TOKEN>",
+  "user": {
+    "id": 12,
+    "username": "candidate",
+    "email": "candidate@example.com",
+    "first_name": "Siddharth",
+    "last_name": "Menon",
+    "name": "Siddharth Menon",
+    "role": "student",
+    "department": "Study Abroad",
+    "phone": "+919876543210",
+    "hr_issued_id": null,
+    "status": "Active",
+    "hr_approval_status": "Verified",
+    "is_biometric_authorized": false
+  }
+}
+
+--------------------------------------------------------------------------------
+2.2. User Login
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/login/
+Access: Public
+
+Request Payload:
+{
+  "username": "candidate@example.com",
+  "password": "SecurePassword2026!"
+}
+
+Response (200 OK):
+{
+  "access": "<JWT_ACCESS_TOKEN>",
+  "refresh": "<JWT_REFRESH_TOKEN>",
+  "user": {
+    "id": 12,
+    "email": "candidate@example.com",
+    "name": "Siddharth Menon",
+    "role": "student",
+    "department": "Study Abroad",
+    "is_biometric_authorized": false
+  }
+}
+
+--------------------------------------------------------------------------------
+2.3. Token Refresh
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/token/refresh/
+Access: Public
+
+Request Payload:
+{
+  "refresh": "<JWT_REFRESH_TOKEN>"
+}
+
+Response (200 OK):
+{
+  "access": "<NEW_JWT_ACCESS_TOKEN>"
+}
+
+--------------------------------------------------------------------------------
+2.4. Current User Profile
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/auth/me/
+Access: Authenticated
+Response (200 OK): Full user object matching the UserSerializer schema.
+
+================================================================================
+3. OMNICHANNEL INQUIRY & INTAKE DESK (FRONT OFFICE & CRM)
+================================================================================
+
+Endpoints:
+  GET    /api/v1/inquiries/
+  POST   /api/v1/inquiries/
+  GET    /api/v1/inquiries/{id}/
+  PUT    /api/v1/inquiries/{id}/
+  PATCH  /api/v1/inquiries/{id}/
+  DELETE /api/v1/inquiries/{id}/
+
+Filters: ?category=&payment_status=&crm_status=&type=&pipeline_stage=&search=
+Ordering: ?ordering=-created_at
+
+Inquiry Categories:
+  - Education (Education & All Courses)
+  - Study Abroad (Study Abroad Hub)
+  - Visa (Visa and Services Hub)
+  - Jobs (Job and Career Hub)
+  - Work While You Study (Work While You Study Track)
+  - Rewards (Rewards Program & Consultant)
+  - General Front Office (General Front Office Reception)
+
+Payment Statuses:
+  - Pending, Contacted, Partially Paid, Paid, Link Sent, Refunded
+
+CRM Statuses:
+  - New Lead, In Progress, Closed Won, Closed Lost
+
+Pipeline Stages:
+  - Intake, Assessment, Documentation, Processing, Completed
+
+Sample POST Payload:
+{
+  "name": "Ananya Sharma",
+  "email": "ananya.sharma@example.com",
+  "phone": "+919876501234",
+  "type": "Walk-in",
+  "category": "Study Abroad",
+  "course": "German Language CEFR A1-B2 Complete Masterclass",
+  "path": "Fast-Track University Admission Pathway",
+  "batch": "October 2026 Immersion Cohort",
+  "slot": "Morning 09:00 AM - 11:00 AM",
+  "price": "$199",
+  "payment_status": "Pending",
+  "crm_status": "New Lead",
+  "pipeline_stage": "Intake",
+  "visa_processing_stage": "Profile Assessment"
+}
+
+Sample GET Response (200 OK):
+[
+  {
+    "id": "ea08b32e-57bf-4a93-95ed-641bc4e3914d",
+    "name": "Ananya Sharma",
+    "email": "ananya.sharma@example.com",
+    "phone": "+919876501234",
+    "type": "Walk-in",
+    "token_number": "ILA-WALK-101",
+    "course": "German Language CEFR A1-B2 Complete Masterclass",
+    "path": "Fast-Track University Admission Pathway",
+    "batch": "October 2026 Immersion Cohort",
+    "slot": "Morning 09:00 AM - 11:00 AM",
+    "price": "$199",
+    "category": "Study Abroad",
+    "payment_status": "Pending",
+    "crm_status": "New Lead",
+    "pipeline_stage": "Intake",
+    "assigned_staff_id": "EMP-003",
+    "assigned_staff_name": "Eleanor Cross",
+    "follow_up_date": "2026-09-12",
+    "follow_up_status": "Scheduled",
+    "visa_processing_stage": "Profile Assessment",
+    "follow_ups": [],
+    "created_at": "2026-09-09T07:12:55.123456Z",
+    "updated_at": "2026-09-09T07:12:55.123456Z"
+  }
+]
+
+Follow-up Records Endpoints:
+  GET  /api/v1/follow-ups/
+  POST /api/v1/follow-ups/
+  Payload:
+  {
+    "inquiry": "ea08b32e-57bf-4a93-95ed-641bc4e3914d",
+    "date": "2026-09-09",
+    "staff_name": "Eleanor Cross",
+    "channel": "WhatsApp",
+    "notes": "Candidate confirmed attendance for APS documentation webinar.",
+    "outcome": "Interested"
+  }
+
+================================================================================
+4. AI TIE-UP ENGINE & PARTNER INSTITUTION REGISTRY
+================================================================================
+
+Endpoints:
+  GET    /api/v1/partners/
+  POST   /api/v1/partners/
+  GET    /api/v1/partners/{id}/
+  PATCH  /api/v1/partners/{id}/
+  DELETE /api/v1/partners/{id}/
+
+Filters: ?category=&country=&status=&search=
+
+Partner Categories:
+  - University (Public / Private University)
+  - Corporate Employer (Corporate Employer / Placement)
+  - Hospital / Healthcare (Hospital / Healthcare)
+  - Vocational School (Ausbildung) (Vocational School (Ausbildung))
+
+Partner Pipeline Statuses:
+  - Target Identified
+  - Outreach Drafted
+  - Proposal Dispatched
+  - In Discussion
+  - MOU Signed
+  - Active Tie-up Partner
+
+Sample POST Payload:
+{
+  "name": "IU International University of Applied Sciences",
+  "category": "University",
+  "country": "Germany",
+  "city": "Bad Honnef / Berlin",
+  "contact_person": "Dr. Markus Weber",
+  "email": "partnerships@iu.org",
+  "target_criteria": "Bachelor graduates with min 60% aggregate for MSc AI & Data Analytics",
+  "commission_ratio": "18% tuition commission + €500 enrollment incentive",
+  "status": "Active Tie-up Partner",
+  "synced_departments": ["Study Abroad", "Finance", "Academics"]
+}
+
+Outreach Logs Endpoints:
+  GET  /api/v1/outreach-logs/
+  POST /api/v1/outreach-logs/
+  Payload:
+  {
+    "partner": 1,
+    "subject": "Strategic Educational Corridor Proposal: ILA Academy India x IU Germany",
+    "generated_proposal_text": "Dear Dr. Weber, We represent qualified engineering cohorts in India...",
+    "is_dispatched": true,
+    "response_notes": "Awaiting meeting scheduled for next Tuesday."
+  }
+
+================================================================================
+5. MARKETING STUDIO & CAMPAIGN MANAGEMENT
+================================================================================
+
+Campaigns Endpoints:
+  GET    /api/v1/campaigns/
+  POST   /api/v1/campaigns/
+  PATCH  /api/v1/campaigns/{id}/
+  DELETE /api/v1/campaigns/{id}/
+
+Channels: Meta Ads, Google PPC, WhatsApp, Field Visits, SEO Organic
+Statuses: Active, Completed, Paused
+
+Sample POST Payload:
+{
+  "name": "Pan-India German Masterclass Autumn 2026",
+  "channel": "Meta Ads",
+  "budget": "75000.00",
+  "spent": "22000.00",
+  "target_geography": "Kerala, Tamil Nadu, Karnataka, Maharashtra",
+  "status": "Active",
+  "leads_count": 240,
+  "conversions_count": 31
+}
+
+Sample GET Response (ROI is automatically computed):
+{
+  "id": 1,
+  "name": "Pan-India German Masterclass Autumn 2026",
+  "channel": "Meta Ads",
+  "budget": "75000.00",
+  "spent": "22000.00",
+  "target_geography": "Kerala, Tamil Nadu, Karnataka, Maharashtra",
+  "status": "Active",
+  "leads_count": 240,
+  "conversions_count": 31,
+  "roi": 0.28,
+  "created_at": "2026-09-09T07:12:55Z"
+}
+
+Field Visits Endpoints:
+  GET  /api/v1/field-visits/
+  POST /api/v1/field-visits/
+  Payload:
+  {
+    "institution_visited": "PSG College of Technology",
+    "location": "Coimbatore, Tamil Nadu",
+    "contact_person": "Dean of International Relations",
+    "summary": "Presented German Chancenkarte & Ausbildung pathways to 200+ final year engineers.",
+    "next_action": "Organize dedicated on-campus A1 German registration desk.",
+    "visit_date": "2026-09-15"
+  }
+
+Department Meetings Endpoints:
+  GET  /api/v1/department-meetings/
+  POST /api/v1/department-meetings/
+
+================================================================================
+6. REWARDS PROGRAM & JUNIOR CONSULTANT NETWORK
+================================================================================
+
+Reward Profiles Endpoints:
+  GET /api/v1/rewards/
+  GET /api/v1/rewards/{id}/
+
+Tiers:
+  - Junior Consultant (Entry level, auto-granted on signup, 100 welcome pts)
+  - Senior Executive Consultant
+  - Global Venture Partner
+
+Automatic Milestone Logic:
+  - When monthly_points reach 1,000, `work_certificate_issued` automatically unlocks.
+  - Generates official Work Experience Certificate as a Junior Education Consultant.
+
+Sample GET Response:
+{
+  "id": 4,
+  "consultant_id": "ILA-JC-0012",
+  "user": 12,
+  "user_name": "Siddharth Menon",
+  "user_email": "candidate@example.com",
+  "tier": "Junior Consultant",
+  "active_points": 250,
+  "lifetime_points": 250,
+  "monthly_points": 250,
+  "cash_earned": "450.00",
+  "promoted_categories": ["Study Abroad", "Education"],
+  "work_certificate_issued": false,
+  "transactions": [
+    {
+      "id": 1,
+      "points": 100,
+      "description": "Welcome Bonus for Enrolling in ILA Rewards Club",
+      "milestone_type": "Monthly Payout Unlock (1000 pts)",
+      "reference_inquiry_id": null,
+      "timestamp": "2026-09-09T07:12:55Z"
+    }
+  ],
+  "created_at": "2026-09-09T07:12:55Z"
+}
+
+Reward Transactions Endpoints:
+  GET  /api/v1/reward-transactions/
+  POST /api/v1/reward-transactions/
+
+================================================================================
+7. WORK WHILE STUDY & AI PRELIMINARY INTERVIEWS
+================================================================================
+
+Work-Study Application Endpoints:
+  GET    /api/v1/work-study-applications/
+  POST   /api/v1/work-study-applications/
+  PATCH  /api/v1/work-study-applications/{id}/
+
+Access: POST is Public for candidate self-application.
+
+Tracks:
+  - Work While You Learn in India
+  - Part time While You Study Abroad
+  - German Project Onboarding Pathway
+  - Junior Consultant Track
+
+Sample POST Payload:
+{
+  "candidate_name": "Rohan Kumar",
+  "email": "rohan.kumar@example.com",
+  "phone": "+919123456789",
+  "track": "German Project Onboarding Pathway",
+  "sub_domain": "Healthcare Operations & Nursing Support"
+}
+
+AI Interview Trigger:
+  Upon application submission, Celery automatically invokes `trigger_ai_preliminary_interview`,
+  generating the unique interactive AI agent interview room link:
+  `https://interview.ilaglobal.edu/session/{application_id}`
+
+================================================================================
+8. DYNAMIC VISA REQUIREMENTS & SETTLEMENT SUPPORT
+================================================================================
+
+Visa Rules Endpoints:
+  GET  /api/v1/visa-rules/
+  POST /api/v1/visa-rules/
+  Filters: ?country=&visa_type=
+
+Sample GET Response:
+[
+  {
+    "id": 1,
+    "country": "Germany",
+    "visa_type": "National Student Visa (Type D)",
+    "blocked_funds_amount": "€11,904 / yr",
+    "embassy_queue_days": "20-30 Days",
+    "primary_authority": "German Embassy / VFS Global New Delhi",
+    "mandatory_checklists": [
+      "APS Certificate (Original)",
+      "Expatrio/Fintiba Blocked Account Confirmation (€11,904)",
+      "Health Insurance (Techniker Krankenkasse)",
+      "German University Unconditional Admission Letter"
+    ],
+    "last_monitored_update": "2026-09-09T07:12:55Z"
+  }
+]
+
+Settlement Service Requests:
+  GET  /api/v1/settlement-requests/
+  POST /api/v1/settlement-requests/
+  Access: Public intake enabled for arriving students.
+
+Sample POST Payload:
+{
+  "candidate_name": "Rohan Kumar",
+  "email": "rohan.kumar@example.com",
+  "target_country": "Germany",
+  "arrival_date": "2026-10-01",
+  "services_requested": [
+    "Airport Pickup & Reception",
+    "Accommodation & Room Arrangement (WG)",
+    "Documentation & Bank Account (Anmeldung/Expatrio)",
+    "Part-time Job Placement Assistance"
+  ]
+}
+
+================================================================================
+9. CORE ENTERPRISE OPERATIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+9.1. Staff Directory (/api/v1/staff/)
+--------------------------------------------------------------------------------
+GET   /api/v1/staff/
+PATCH /api/v1/staff/{id}/
+Filters: ?role=&department=&status=&is_biometric_authorized=
+
+--------------------------------------------------------------------------------
+9.2. Franchise Partners (/api/v1/franchises/)
+--------------------------------------------------------------------------------
+GET  /api/v1/franchises/
+POST /api/v1/franchises/
+Sample POST Payload:
+{
+  "name": "Bavaria Regional Educational Corridor",
+  "email": "munich.franchise@ilaglobal.edu",
+  "region": "Munich, Germany",
+  "franchise_token": "ILA-FR-MUNICH-2026"
+}
+
+--------------------------------------------------------------------------------
+9.3. Enterprise Tasks (/api/v1/tasks/)
+--------------------------------------------------------------------------------
+GET  /api/v1/tasks/
+POST /api/v1/tasks/
+Sample POST Payload:
+{
+  "title": "Validate APS Certificates for TUM Winter Cohort",
+  "description": "Audit and verify APS certificates for 24 German MSc applicants.",
+  "assigned_to_dept": "Visa",
+  "status": "In Progress",
+  "priority": "High"
+}
+
+--------------------------------------------------------------------------------
+9.4. Staff Attendance (/api/v1/attendance/)
+--------------------------------------------------------------------------------
+GET  /api/v1/attendance/
+POST /api/v1/attendance/
+Sample POST Payload:
+{
+  "staff_id": "EMP-001",
+  "staff_name": "Alexander Vance",
+  "check_in_time": "08:45 AM",
+  "status": "Present",
+  "date": "2026-09-09"
+}
+
+--------------------------------------------------------------------------------
+9.5. Departmental Approvals (/api/v1/approvals/)
+--------------------------------------------------------------------------------
+GET  /api/v1/approvals/
+POST /api/v1/approvals/
+Sample POST Payload:
+{
+  "type": "Commission Payout",
+  "description": "Approve monthly Junior Consultant points milestone payout.",
+  "requested_by": "Finance & Accounts",
+  "department": "Finance",
+  "status": "Approved",
+  "date": "2026-09-09"
+}
+
+================================================================================
+10. COMPLETE TYPESCRIPT DATA INTERFACES (FRONTEND CONTRACTS)
+================================================================================
+
+Create `src/types/ilaBackend.ts`:
+
+```typescript
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  role: string;
+  department?: string;
+  phone?: string;
+  hr_issued_id?: string;
+  status: 'Active' | 'On Leave' | 'Terminated';
+  hr_approval_status: 'Pending HR Approval' | 'Verified' | 'Rejected';
+  is_biometric_authorized: boolean;
+}
+
+export interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  type: 'Walk-in' | 'Online' | 'Referral' | 'Phone';
+  token_number?: string;
+  course?: string;
+  path?: string;
+  batch?: string;
+  slot?: string;
+  price: string;
+  category: string;
+  payment_status: 'Pending' | 'Contacted' | 'Partially Paid' | 'Paid' | 'Link Sent' | 'Refunded';
+  crm_status: 'New Lead' | 'In Progress' | 'Closed Won' | 'Closed Lost';
+  pipeline_stage: string;
+  assigned_staff_id?: string;
+  assigned_staff_name?: string;
+  follow_up_date?: string;
+  follow_up_status?: string;
+  visa_processing_stage?: string;
+  follow_ups?: FollowUpRecord[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FollowUpRecord {
+  id?: number;
+  inquiry: string;
+  date: string;
+  staff_name: string;
+  channel: 'Phone Call' | 'WhatsApp' | 'In-Person' | 'Email';
+  notes: string;
+  outcome: string;
+  created_at?: string;
+}
+
+export interface PartnerInstitution {
+  id: number;
+  name: string;
+  category: 'University' | 'Corporate Employer' | 'Hospital / Healthcare' | 'Vocational School (Ausbildung)';
+  country: string;
+  city: string;
+  contact_person: string;
+  email: string;
+  target_criteria: string;
+  commission_ratio: string;
+  status: string;
+  synced_departments: string[];
+  outreach_logs_count?: number;
+  last_updated?: string;
+}
+
+export interface MarketingCampaign {
+  id: number;
+  name: string;
+  channel: 'Meta Ads' | 'Google PPC' | 'WhatsApp' | 'Field Visits' | 'SEO Organic';
+  budget: string;
+  spent: string;
+  target_geography: string;
+  status: 'Active' | 'Completed' | 'Paused';
+  leads_count: number;
+  conversions_count: number;
+  roi?: number;
+  created_at?: string;
+}
+
+export interface RewardProfile {
+  id: number;
+  consultant_id: string;
+  user: number;
+  user_name: string;
+  user_email: string;
+  tier: 'Junior Consultant' | 'Senior Executive Consultant' | 'Global Venture Partner';
+  active_points: number;
+  lifetime_points: number;
+  monthly_points: number;
+  cash_earned: string;
+  promoted_categories: string[];
+  work_certificate_issued: boolean;
+  transactions?: RewardTransaction[];
+  created_at?: string;
+}
+
+export interface RewardTransaction {
+  id: number;
+  points: number;
+  description: string;
+  milestone_type: string;
+  reference_inquiry_id?: string;
+  timestamp: string;
+}
+
+export interface WorkStudyApplication {
+  id: number;
+  candidate_name: string;
+  email: string;
+  phone: string;
+  track: string;
+  sub_domain: string;
+  ai_preliminary_interview_link?: string;
+  ai_interview_score: number;
+  ai_interview_status: string;
+  is_onboarded_to_dept: boolean;
+  created_at?: string;
+}
+
+export interface VisaRequirementRule {
+  id: number;
+  country: string;
+  visa_type: string;
+  blocked_funds_amount: string;
+  embassy_queue_days: string;
+  primary_authority: string;
+  mandatory_checklists: string[];
+  last_monitored_update?: string;
+}
+
+export interface SettlementServiceRequest {
+  id: number;
+  candidate_name: string;
+  email: string;
+  target_country: string;
+  arrival_date?: string;
+  services_requested: string[];
+  status: string;
+  coordinator_name?: string;
+}
+
+export interface EnterpriseTask {
+  id: number;
+  title: string;
+  description?: string;
+  assigned_to_dept: string;
+  status: 'Pending' | 'In Progress' | 'Success' | 'Negative';
+  priority: 'High' | 'Medium' | 'Low';
+  created_at?: string;
+  updated_at?: string;
+}
+```
+
+================================================================================
+11. READY-TO-USE REACT API SERVICES & HOOK EXAMPLES
+================================================================================
+
+### 11.1. Inquiries Service (`src/services/api/inquiryService.ts`)
+```typescript
+import apiClient from './client';
+import { Inquiry } from '../../types/ilaBackend';
+
+export const inquiryService = {
+  getAll: (params?: Record<string, string>) =>
+    apiClient.get<Inquiry[]>('/inquiries/', { params }),
+
+  getById: (id: string) =>
+    apiClient.get<Inquiry>(`/inquiries/${id}/`),
+
+  create: (data: Partial<Inquiry>) =>
+    apiClient.post<Inquiry>('/inquiries/', data),
+
+  update: (id: string, data: Partial<Inquiry>) =>
+    apiClient.patch<Inquiry>(`/inquiries/${id}/`, data),
+
+  delete: (id: string) =>
+    apiClient.delete(`/inquiries/${id}/`),
+
+  addFollowUp: (data: { inquiry: string; date: string; staff_name: string; channel: string; notes: string; outcome: string }) =>
+    apiClient.post('/follow-ups/', data),
+};
+```
+
+### 11.2. React Hook Example (`src/hooks/useInquiries.ts`)
+```typescript
+import { useState, useEffect } from 'react';
+import { inquiryService } from '../services/api/inquiryService';
+import { Inquiry } from '../types/ilaBackend';
+
+export function useInquiries(categoryFilter?: string) {
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchInquiries = async () => {
+    setLoading(true);
+    try {
+      const params = categoryFilter ? { category: categoryFilter } : undefined;
+      const res = await inquiryService.getAll(params);
+      setInquiries(res.data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to fetch inquiries.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInquiries();
+  }, [categoryFilter]);
+
+  const addInquiry = async (payload: Partial<Inquiry>) => {
+    const res = await inquiryService.create(payload);
+    setInquiries((prev) => [res.data, ...prev]);
+    return res.data;
+  };
+
+  return { inquiries, loading, error, refresh: fetchInquiries, addInquiry };
+}
+```
+
+### 11.3. Partners & AI Tie-Up Service (`src/services/api/partnerService.ts`)
+```typescript
+import apiClient from './client';
+import { PartnerInstitution } from '../../types/ilaBackend';
+
+export const partnerService = {
+  getAll: (params?: Record<string, string>) =>
+    apiClient.get<PartnerInstitution[]>('/partners/', { params }),
+
+  create: (data: Partial<PartnerInstitution>) =>
+    apiClient.post<PartnerInstitution>('/partners/', data),
+
+  dispatchProposal: (partnerId: number, subject: string, proposalText: string) =>
+    apiClient.post('/outreach-logs/', {
+      partner: partnerId,
+      subject,
+      generated_proposal_text: proposalText,
+### 11.4. ILA Live Consultant ("Ilas") Chat Service (`src/services/api/consultantService.ts`)
+```typescript
+import apiClient from './client';
+
+export interface ConsultantChatPayload {
+  message: string;
+  topic?: string;
+  history?: Array<{ role: 'user' | 'model'; content: string }>;
+  user_email?: string;
+  user_phone?: string;
+}
+
+export interface ConsultantChatResponse {
+  reply: string;
+  topic: string;
+  suggested_actions: string[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export const consultantService = {
+  chat: (data: ConsultantChatPayload) =>
+    apiClient.post<ConsultantChatResponse>('/consultant/chat/', data),
+
+  getTokenAnalytics: () =>
+    apiClient.get('/consultant/tokens/summary/'),
+};
+```
+
+================================================================================
+END OF ILA_WEB BACKEND API DOCUMENTATION & FRONTEND BLUEPRINT
+================================================================================
+

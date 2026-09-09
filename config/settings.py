@@ -30,6 +30,9 @@ DEBUG = dtconfig("DEBUG", default=True)
 
 ALLOWED_HOSTS = ['*']
 
+# Gemini API Key Configuration
+GEMINI_API_KEY = dtconfig('GEMINI_API_KEY', default=os.getenv('GEMINI_API_KEY', ''))
+
 
 # Application definition
 
@@ -151,6 +154,19 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5176',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://ilaglobal.edu',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-biometric-token',
 ]
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173',
@@ -163,6 +179,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5175',
     'http://localhost:5176',
     'http://127.0.0.1:5176',
+    'https://ilaglobal.edu',
 ]
 
 
@@ -171,14 +188,31 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'Applications.authentication.CookieJWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ),
+    'DEFAULT_FILTER_BACKENDS': (
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
 }
+
+# Celery Configuration for Background Notifications & Outreach
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+# Biometric & Security Gate Master Override PIN
+BIOMETRIC_SECURITY_PIN = os.getenv('BIOMETRIC_SECURITY_PIN', '7890')
+
 
 
 SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'

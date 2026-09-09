@@ -1,0 +1,326 @@
+================================================================================
+ILA CONSULTANT ("ILAS") AI CHAT ENGINE - FRONTEND INTEGRATION GUIDE
+================================================================================
+Backend Component: Applications.ILA_WEB.IlaConsultant
+API Base URL: http://127.0.0.1:8000/api/v1/consultant/ (or https://api.ilaglobal.edu/api/v1/consultant/)
+Target Frontend: React 18+ / Vite / TypeScript / Axios / Tailwind
+Generated: September 2026
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. ARCHITECTURAL OVERVIEW & WHY BACKEND PROXY IS USED
+2. COMPLETE ENDPOINT SPECIFICATION
+   - 2.1. Live Consultant Chat (`POST /api/v1/consultant/chat/`)
+   - 2.2. Token Analytics Summary (`GET /api/v1/consultant/tokens/summary/`)
+3. FRONTEND INTEGRATION CODE (`src/lib/consultantBot.ts`)
+4. REACT HOOK IMPLEMENTATION (`src/hooks/useConsultantBot.ts`)
+5. CHAT MODAL & ACTION CHIPS UI COMPONENT EXAMPLE
+6. TOKEN USAGE & COST WIDGET (CEO / ADMIN DESK)
+
+================================================================================
+1. ARCHITECTURAL OVERVIEW & WHY BACKEND PROXY IS USED
+================================================================================
+
+1. API Key Confidentiality:
+   The Google Gemini API Key (`GEMINI_API_KEY`) is stored strictly on the Django
+   backend server in `.env`. It is never bundled into client JavaScript or exposed in DevTools.
+
+2. Quota & Cost Protection:
+   Protected by IP-based rate limiting (20 requests per minute per IP via `django-ratelimit`).
+
+3. Proprietary Domain Instructions:
+   The master system instruction (`ILA_CONSULTANT_SYSTEM_INSTRUCTION`) containing
+   official courses, Chancenkarte rules, €11,904 blocked account details, and
+   relocation steps resides securely on the server.
+
+4. Token Consumption & Cost Auditing:
+   Every user prompt and model response logs input/output tokens and estimated
+   costs into the `AITokenUsageLog` database model for live CEO analytics.
+
+================================================================================
+2. COMPLETE ENDPOINT SPECIFICATION
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1. Live Consultant Chat
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/consultant/chat/
+Headers:
+  Content-Type: application/json
+Rate Limit: 20 requests per minute per IP
+
+Request Body:
+{
+  "message": "What are the requirements for German Chancenkarte?",
+  "topic": "jobs",
+  "history": [
+    {
+      "role": "user",
+      "content": "Hi, I want to work in Germany."
+    },
+    {
+      "role": "model",
+      "content": "Hello! I can guide you through the German Opportunity Card, Job Seeker Visas, and Ausbildung pathways. Are you a degree holder?"
+    }
+  ],
+  "user_email": "candidate@example.com",
+  "user_phone": "+919876543210"
+}
+
+Field Definitions:
+  - `message` (string, required): User's latest question (max 1500 chars).
+  - `topic` (string, optional): Contextual tag. Choices: 'general', 'education', 'visa', 'jobs', 'housing', 'arrival'. Default: 'general'.
+  - `history` (array of objects, optional): Previous chat messages with `role` ('user' or 'model') and `content`.
+  - `user_email` (string, optional): For lead synchronization.
+  - `user_phone` (string, optional): For WhatsApp advisor handoff.
+
+Success Response (200 OK):
+{
+  "reply": "To qualify for the **German Opportunity Card (Chancenkarte)**, you need:\n\n1. **Recognized Degree or Vocational Training**: Completed university degree or 2+ years vocational training recognized in your country.\n2. **Language Proficiency**: Minimum **German A1** or **English B2**.\n3. **Points System (Min 6 points)**: Points awarded for age (under 35), work experience, language proficiency (German A2/B1), and partner qualifications.\n4. **Proof of Financial Resources**: Approx. **€1,027/month** via Blocked Account (Sperrkonto).\n\nWould you like our team to evaluate your points score or assist with German language prep?",
+  "topic": "jobs",
+  "suggested_actions": [
+    "Chancenkarte Evaluation",
+    "AI Resume Match",
+    "Ausbildung Programs"
+  ],
+  "usage": {
+    "prompt_tokens": 520,
+    "completion_tokens": 145,
+    "total_tokens": 665
+  }
+}
+
+Suggested Actions Mapping by Topic:
+  - `jobs`:      ["Chancenkarte Evaluation", "AI Resume Match", "Ausbildung Programs"]
+  - `visa`:      ["Check Visa Checklist", "Book Embassy Prep", "Blocked Account Guide"]
+  - `housing`:   ["WG Accommodations", "Blocked Account Guide", "Anmeldung Registration"]
+  - `arrival`:   ["Arrival Checklist PDF", "Anmeldung Guide", "Airport Reception"]
+  - `education`: ["View German Courses", "Download Syllabus", "Book Free Demo"]
+  - `general`:   ["Talk to Consultant", "Call Us", "View Programs"]
+
+--------------------------------------------------------------------------------
+2.2. Token Analytics Summary (CEO & Admin Portal)
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/consultant/tokens/summary/
+Access: Public / Staff (used by CEO Command Desk)
+
+Success Response (200 OK):
+{
+  "total_queries": 48,
+  "total_tokens": 32450,
+  "prompt_tokens": 24200,
+  "completion_tokens": 8250,
+  "estimated_cost": {
+    "usd": 0.0043,
+    "inr": 0.37
+  }
+}
+
+================================================================================
+3. FRONTEND INTEGRATION CODE (`src/lib/consultantBot.ts`)
+================================================================================
+
+Replace or update your `src/lib/consultantBot.ts`:
+
+```typescript
+import axios from 'axios';
+
+export interface ChatMessage {
+  role: 'user' | 'model' | 'assistant';
+  content: string;
+}
+
+export interface ConsultantResponse {
+  reply: string;
+  topic: string;
+  suggested_actions: string[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+
+export async function askLiveConsultant(
+  message: string,
+  topic: string = 'general',
+  history: ChatMessage[] = [],
+  userEmail?: string,
+  userPhone?: string
+): Promise<ConsultantResponse> {
+  try {
+    const res = await axios.post<ConsultantResponse>(`${API_BASE}/consultant/chat/`, {
+      message,
+      topic,
+      history: history.map(h => ({
+        role: h.role === 'assistant' ? 'model' : h.role,
+        content: h.content
+      })),
+      user_email: userEmail,
+      user_phone: userPhone,
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    });
+
+    return res.data;
+  } catch (error: any) {
+    console.warn('Consultant backend unreachable, falling back to local guidance:', error);
+    return {
+      reply: "Thank you for reaching out to ILA Academy! Our human academic advisors are online to assist you directly with German courses, Chancenkarte, and Visa requirements.",
+      topic,
+      suggested_actions: ["Call Us", "Email Us", "Book Callback"],
+    };
+  }
+}
+```
+
+================================================================================
+4. REACT HOOK IMPLEMENTATION (`src/hooks/useConsultantBot.ts`)
+================================================================================
+
+```typescript
+import { useState } from 'react';
+import { askLiveConsultant, ChatMessage, ConsultantResponse } from '../lib/consultantBot';
+
+export function useConsultantBot(initialTopic: string = 'general') {
+  const [history, setHistory] = useState<ChatMessage[]>([
+    {
+      role: 'model',
+      content: "Hello! I am **Ilas**, your ILA Global Live Consultant. How can I assist your journey to Germany or Europe today?",
+    }
+  ]);
+  const [actions, setActions] = useState<string[]>([
+    "Chancenkarte Requirements",
+    "German Language Courses",
+    "Work While You Study"
+  ]);
+  const [topic, setTopic] = useState<string>(initialTopic);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const sendMessage = async (userText: string) => {
+    if (!userText.trim() || loading) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: userText };
+    setHistory((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const response: ConsultantResponse = await askLiveConsultant(
+        userText,
+        topic,
+        history
+      );
+
+      const botMsg: ChatMessage = { role: 'model', content: response.reply };
+      setHistory((prev) => [...prev, botMsg]);
+      if (response.suggested_actions?.length) {
+        setActions(response.suggested_actions);
+      }
+      if (response.topic) {
+        setTopic(response.topic);
+      }
+    } catch {
+      // Handled gracefully inside askLiveConsultant
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    history,
+    actions,
+    topic,
+    loading,
+    setTopic,
+    sendMessage,
+  };
+}
+```
+
+================================================================================
+5. TOKEN USAGE & COST WIDGET FOR CEO / ADMIN PORTAL
+================================================================================
+
+Add this component to your Executive Command Center (`src/components/dashboard/AIAnalyticsCard.tsx`):
+
+```tsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Bot, Cpu, DollarSign, Activity } from 'lucide-react';
+
+interface TokenAnalytics {
+  total_queries: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  estimated_cost: {
+    usd: number;
+    inr: number;
+  };
+}
+
+export const AIAnalyticsCard: React.FC = () => {
+  const [data, setData] = useState<TokenAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+    axios.get<TokenAnalytics>(`${API_BASE}/consultant/tokens/summary/`)
+      .then((res) => setData(res.data))
+      .catch((err) => console.error('Failed to load token analytics', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data) return null;
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-white">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Bot className="w-5 h-5 text-indigo-400" />
+          <h3 className="font-semibold text-sm">Gemini Live Consultant Usage</h3>
+        </div>
+        <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full">
+          Live Sync
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <Activity className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+          <p className="text-xs text-slate-400">Total Consultations</p>
+          <p className="text-lg font-bold">{data.total_queries}</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <Cpu className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
+          <p className="text-xs text-slate-400">Total Tokens</p>
+          <p className="text-lg font-bold">{data.total_tokens.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <DollarSign className="w-4 h-4 mx-auto mb-1 text-amber-400" />
+          <p className="text-xs text-slate-400">Est. Cost (USD)</p>
+          <p className="text-lg font-bold">${data.estimated_cost.usd.toFixed(4)}</p>
+        </div>
+
+        <div className="bg-slate-800/50 p-3 rounded-lg">
+          <span className="text-xs font-semibold text-blue-400 block mb-1">₹</span>
+          <p className="text-xs text-slate-400">Est. Cost (INR)</p>
+          <p className="text-lg font-bold">₹{data.estimated_cost.inr.toFixed(2)}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+
+================================================================================
+END OF ILA CONSULTANT FRONTEND INTEGRATION GUIDE
+================================================================================

@@ -370,7 +370,7 @@ class Employee(TimeStampedUUIDModel):
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='direct_reports')
     employee_code = models.CharField(max_length=50, unique=True)
     designation = models.CharField(max_length=150)
-    joining_date = models.DateField(default=timezone.now)
+    joining_date = models.DateField(default=timezone.localdate)
     employment_type = models.CharField(max_length=30, choices=EmploymentType.choices, default=EmploymentType.FULL_TIME)
     employment_status = models.CharField(max_length=30, choices=EmploymentStatus.choices, default=EmploymentStatus.ACTIVE)
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
@@ -512,7 +512,7 @@ class Candidate(TenantScopedModel):
     evaluation = models.JSONField(default=dict, blank=True)
     expected_salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
-    application_date = models.DateField(default=timezone.now)
+    application_date = models.DateField(default=timezone.localdate)
 
     class Meta:
         ordering = ['-created_at']
@@ -690,7 +690,7 @@ class Expense(TenantScopedModel):
     title = models.CharField(max_length=255)
     category = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     status = models.CharField(max_length=30, choices=ExpenseStatus.choices, default=ExpenseStatus.PENDING)
     approval = models.ForeignKey(
         Approval,
@@ -714,7 +714,7 @@ class Campaign(TenantScopedModel):
     budget = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     spent = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     leads_generated = models.IntegerField(default=0)
-    start_date = models.DateField(default=timezone.now)
+    start_date = models.DateField(default=timezone.localdate)
     end_date = models.DateField(null=True, blank=True)
 
     class Meta:

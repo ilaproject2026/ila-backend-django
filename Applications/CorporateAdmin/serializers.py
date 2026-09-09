@@ -1,9 +1,151 @@
 from rest_framework import serializers
+from django.db import models
 from .models import (
     Organization, Branch, Department, Team, Profile, Role, Permission, RolePermission,
     Employee, Inquiry, Lead, Opportunity, Candidate, Onboarding,
     Task, TaskComment, Approval, Expense, Campaign, Notification, AuditLog
 )
+
+
+# ============================================================================
+# FLEXIBLE RELATION FIELDS (MOCK ID & RESILIENT RESOLUTION)
+# ============================================================================
+
+class FlexibleDepartmentField(serializers.PrimaryKeyRelatedField):
+    """
+    Resolves real UUIDs, mock UUIDs ('d0000000-0000-0000-0000-000000000003'),
+    department codes ('DEP-FIN'), or names to a valid Department instance.
+    """
+    def to_internal_value(self, data):
+        if not data:
+            return None
+        if isinstance(data, Department):
+            return data
+
+        data_str = str(data).strip()
+        # 1. Direct PK lookup
+        try:
+            return self.get_queryset().get(pk=data_str)
+        except Exception:
+            pass
+
+        # 2. Mock UUID mapping from frontend seeds
+        mock_map = {
+            'd0000000-0000-0000-0000-000000000001': 'DEP-EXEC',
+            'd0000000-0000-0000-0000-000000000002': 'DEP-HR',
+            'd0000000-0000-0000-0000-000000000003': 'DEP-FIN',
+            'd0000000-0000-0000-0000-000000000004': 'DEP-SALES',
+            'd0000000-0000-0000-0000-000000000005': 'DEP-OPS',
+            'd0000000-0000-0000-0000-000000000006': 'DEP-ENG',
+        }
+        target_code = mock_map.get(data_str.lower())
+        if target_code:
+            dept = self.get_queryset().filter(code=target_code).first()
+            if dept:
+                return dept
+
+        # 3. Lookup by code or name
+        dept = self.get_queryset().filter(models.Q(code__iexact=data_str) | models.Q(name__icontains=data_str)).first()
+        if dept:
+            return dept
+
+        # 4. Fallback to first department
+        fallback = self.get_queryset().first()
+        if fallback:
+            return fallback
+
+        raise serializers.ValidationError(f"Invalid department: '{data}'.")
+
+
+class FlexibleEmployeeField(serializers.PrimaryKeyRelatedField):
+    """
+    Resolves real UUIDs, mock UUIDs ('e0000000-0000-0000-0000-000000000001'),
+    employee codes ('EMP-001'), emails, or names to a valid Employee instance.
+    """
+    def to_internal_value(self, data):
+        if not data:
+            return None
+        if isinstance(data, Employee):
+            return data
+
+        data_str = str(data).strip()
+        # 1. Direct PK lookup
+        try:
+            return self.get_queryset().get(pk=data_str)
+        except Exception:
+            pass
+
+        # 2. Mock UUID mapping from frontend seeds
+        mock_map = {
+            'e0000000-0000-0000-0000-000000000001': 'EMP-001',
+            'e0000000-0000-0000-0000-000000000002': 'EMP-002',
+            'e0000000-0000-0000-0000-000000000003': 'EMP-003',
+            'e0000000-0000-0000-0000-000000000004': 'EMP-004',
+            'e0000000-0000-0000-0000-000000000005': 'EMP-005',
+            'e0000000-0000-0000-0000-000000000006': 'EMP-006',
+        }
+        target_code = mock_map.get(data_str.lower())
+        if target_code:
+            emp = self.get_queryset().filter(employee_code=target_code).first()
+            if emp:
+                return emp
+
+        # 3. Lookup by code, email, or name
+        emp = self.get_queryset().filter(
+            models.Q(employee_code__iexact=data_str) |
+            models.Q(profile__email__iexact=data_str) |
+            models.Q(profile__full_name__icontains=data_str)
+        ).first()
+        if emp:
+            return emp
+
+        # 4. Fallback to first employee
+        fallback = self.get_queryset().first()
+        if fallback:
+            return fallback
+
+        raise serializers.ValidationError(f"Invalid employee: '{data}'.")
+
+
+def get_default_organization():
+    org = Organization.objects.first()
+    if not org:
+        org = Organization.objects.create(
+            name="Global Enterprise Group (GEG)",
+            code="GEG-CORP",
+            status='ACTIVE'
+        )
+    return org
+
+
+class FlexibleOrganizationField(serializers.PrimaryKeyRelatedField):
+    """
+    Resolves real UUIDs, mock UUIDs ('o0000000-0000-0000-0000-000000000001'),
+    organization codes ('GEG-CORP'), or falls back to the default active organization.
+    """
+    def __init__(self, **kwargs):
+        kwargs.setdefault('queryset', Organization.objects.all())
+        kwargs.setdefault('required', False)
+        kwargs.setdefault('default', get_default_organization)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        if not data:
+            return get_default_organization()
+        if isinstance(data, Organization):
+            return data
+
+        data_str = str(data).strip()
+        try:
+            return self.get_queryset().get(pk=data_str)
+        except Exception:
+            pass
+
+        org = self.get_queryset().filter(models.Q(code__iexact=data_str) | models.Q(name__icontains=data_str)).first()
+        if org:
+            return org
+
+        return get_default_organization()
 
 
 # ============================================================================
@@ -17,11 +159,25 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
 
 class BranchSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
     organization_name = serializers.CharField(source='organization.name', read_only=True)
 
     class Meta:
         model = Branch
         fields = '__all__'
+        extra_kwargs = {'organization': {'required': False}, 'code': {'required': False}}
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if not data.get('code') and data.get('name'):
+            words = str(data['name']).strip().split()
+            code = (''.join([w[0].upper() for w in words[:4]]) if len(words) > 1 else data['name'][:4].upper())
+            data['code'] = code or 'BRN'
+        elif data.get('code'):
+            data['code'] = str(data['code']).strip().upper()
+        return super().to_internal_value(data)
+
+
 
 
 # ============================================================================
@@ -93,9 +249,31 @@ class DepartmentReadSerializer(serializers.ModelSerializer):
 
 
 class DepartmentWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department_head = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Department
         fields = ['organization', 'name', 'code', 'description', 'department_head', 'budget', 'status']
+        extra_kwargs = {
+            'organization': {'required': False},
+            'department_head': {'required': False},
+            'code': {'required': False},
+            'budget': {'required': False},
+            'status': {'required': False},
+            'description': {'required': False, 'allow_blank': True},
+        }
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if not data.get('code') and data.get('name'):
+            words = str(data['name']).strip().split()
+            code = (''.join([w[0].upper() for w in words[:4]]) if len(words) > 1 else data['name'][:4].upper())
+            data['code'] = code or 'DEPT'
+        elif data.get('code'):
+            data['code'] = str(data['code']).strip().upper()
+        return super().to_internal_value(data)
+
 
 
 class TeamReadSerializer(serializers.ModelSerializer):
@@ -115,9 +293,16 @@ class TeamReadSerializer(serializers.ModelSerializer):
 
 
 class TeamWriteSerializer(serializers.ModelSerializer):
+    team_lead = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Team
         fields = ['department', 'name', 'description', 'team_lead', 'status']
+        extra_kwargs = {
+            'team_lead': {'required': False},
+            'department': {'required': False},
+        }
 
 
 class EmployeeReadSerializer(serializers.ModelSerializer):
@@ -142,6 +327,9 @@ class EmployeeReadSerializer(serializers.ModelSerializer):
 
 
 class EmployeeWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    manager = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
     full_name = serializers.CharField(write_only=True, required=False)
     email = serializers.EmailField(write_only=True, required=False)
     phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -155,7 +343,10 @@ class EmployeeWriteSerializer(serializers.ModelSerializer):
             'designation', 'joining_date', 'employment_type', 'employment_status', 'salary'
         ]
         extra_kwargs = {
-            'profile': {'required': False}
+            'profile': {'required': False},
+            'organization': {'required': False},
+            'department': {'required': False},
+            'manager': {'required': False},
         }
 
     def create(self, validated_data):
@@ -189,6 +380,10 @@ class InquiryReadSerializer(serializers.ModelSerializer):
 
 
 class InquiryWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    assigned_to = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Inquiry
         fields = '__all__'
@@ -205,6 +400,10 @@ class LeadReadSerializer(serializers.ModelSerializer):
 
 
 class LeadWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    assigned_to = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Lead
         fields = '__all__'
@@ -222,6 +421,8 @@ class OpportunityReadSerializer(serializers.ModelSerializer):
 
 
 class OpportunityWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+
     class Meta:
         model = Opportunity
         fields = '__all__'
@@ -242,6 +443,10 @@ class CandidateReadSerializer(serializers.ModelSerializer):
 
 
 class CandidateWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    assigned_recruiter = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Candidate
         fields = '__all__'
@@ -260,6 +465,8 @@ class OnboardingReadSerializer(serializers.ModelSerializer):
 
 
 class OnboardingWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+
     class Meta:
         model = Onboarding
         fields = '__all__'
@@ -293,6 +500,11 @@ class TaskReadSerializer(serializers.ModelSerializer):
 
 
 class TaskWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    assigned_to = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+    created_by = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Task
         fields = '__all__'
@@ -313,6 +525,10 @@ class ApprovalReadSerializer(serializers.ModelSerializer):
 
 
 class ApprovalWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    requester = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+    approver = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Approval
         fields = '__all__'
@@ -334,13 +550,23 @@ class ExpenseReadSerializer(serializers.ModelSerializer):
 
 
 class ExpenseWriteSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+    department = FlexibleDepartmentField(queryset=Department.objects.all(), required=False, allow_null=True)
+    requester = FlexibleEmployeeField(queryset=Employee.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = Expense
         fields = '__all__'
-        extra_kwargs = {'organization': {'required': False}}
+        extra_kwargs = {
+            'organization': {'required': False},
+            'department': {'required': False},
+            'requester': {'required': False},
+        }
 
 
 class CampaignSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+
     class Meta:
         model = Campaign
         fields = '__all__'
@@ -360,6 +586,8 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 class AuditLogSerializer(serializers.ModelSerializer):
+    organization = FlexibleOrganizationField()
+
     class Meta:
         model = AuditLog
         fields = '__all__'

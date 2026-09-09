@@ -45,6 +45,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
     password = models.CharField(max_length=128)
     
+    first_name = models.CharField(max_length=150, blank=True, default='')
+    last_name = models.CharField(max_length=150, blank=True, default='')
     fullname = models.CharField(max_length=255, null=True, blank=True)
     
     referral_code = models.CharField(max_length=50, unique=True, null=True, blank=True)
@@ -61,16 +63,24 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_login = models.DateTimeField(auto_now=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    # Role & Department Hierarchy
+    # Role & Department Hierarchy (Blueprint Multi-Tier RBAC)
     ROLE_CHOICES = [
-        ('Super Admin', 'Super Admin'),
-        ('CEO', 'CEO'),
-        ('General Manager', 'General Manager'),
+        ('Super Admin', 'Super Admin (Global Authority / Kuttan)'),
+        ('CEO', 'Master CEO'),
+        ('General Manager', 'General Manager (Operational Oversight)'),
+        ('Academic HOD', 'Department Head - Education & All Courses'),
+        ('Study Abroad HOD', 'Department Head - Study Abroad Hub'),
+        ('Visa HOD', 'Department Head - Visa & Compliance'),
+        ('Work & Study HOD', 'Department Head - Work and Study Hub'),
+        ('Jobs HOD', 'Department Head - Jobs & Career Hub'),
+        ('HR Manager', 'HR Department Manager'),
+        ('Finance Officer', 'Finance & Accounts Officer'),
+        ('Marketing Exec', 'Marketing Studio Executive'),
+        ('Academic Counselor', 'Front Office Intake & Academic Counselor'),
+        ('Franchise Partner', 'Franchise Partner / Regional Territory Lead'),
+        ('student', 'Student / Candidate Enrollee'),
+        ('employer', 'Corporate Employer / Partner'),
         ('Tech Admin', 'Tech Admin'),
-        ('Finance Officer', 'Finance Officer'),
-        ('HR Manager', 'HR Manager'),
-        ('Marketing Exec', 'Marketing Exec'),
-        ('Academic Counselor', 'Academic Counselor'),
         ('Student', 'Student'),
         ('Partner', 'Partner'),
     ]
@@ -87,11 +97,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('Front Office', 'Front Office'),
     ]
 
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='Student')
-    department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, null=True, blank=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='student')
+    department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, null=True, blank=True)
     avatar = models.CharField(max_length=500, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     security_pin_hash = models.CharField(max_length=255, null=True, blank=True)
+
+    hr_issued_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    hr_approval_status = models.CharField(
+        max_length=50,
+        choices=[('Pending HR Approval', 'Pending HR Approval'), ('Verified', 'Verified'), ('Rejected', 'Rejected')],
+        default='Verified'
+    )
+    status = models.CharField(
+        max_length=50,
+        choices=[('Active', 'Active'), ('On Leave', 'On Leave'), ('Terminated', 'Terminated')],
+        default='Active'
+    )
+    is_biometric_authorized = models.BooleanField(default=False)
 
     is_admin = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
@@ -102,6 +125,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email", "phone"]
+
+    def get_full_name(self):
+        full = f"{self.first_name} {self.last_name}".strip()
+        return full or self.fullname or self.username or ''
+
+    @property
+    def created_at(self):
+        return self.date_joined
 
     def save(self, *args, **kwargs):
         if not self.referral_code:
@@ -151,13 +182,26 @@ class FranchisePartner(models.Model):
     id = models.CharField(max_length=50, primary_key=True)
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
-    region = models.CharField(max_length=255)
-    partner_token = models.CharField(max_length=255, unique=True)
+    region = models.CharField(max_length=255, default='Germany / EU')
+    partner_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    franchise_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_franchises')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        if not self.id:
+            import uuid
+            self.id = f"FRN-{uuid.uuid4().hex[:8]}"
+        if not self.franchise_token:
+            self.franchise_token = self.partner_token or f"ILA-FR-{uuid.uuid4().hex[:6].upper()}"
+        if not self.partner_token:
+            self.partner_token = self.franchise_token
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.id})"
+
 
 
 class AuditLog(models.Model):

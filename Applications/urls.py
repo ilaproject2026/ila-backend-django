@@ -1,8 +1,8 @@
 from django.urls import path, include
 
 v1_patterns = [
-    path('auth/', include('Applications.Authentication.auth_urls')),
     path('', include('Applications.ILA_WEB.urls')),
+    path('auth/', include('Applications.Authentication.auth_urls')),
     path('', include('Applications.BusinessStudio.urls')),
     path('import-export/', include('Applications.ImportExport.urls')),
     path('global-real-estate/', include('Applications.GlobalRealEstate.urls')),

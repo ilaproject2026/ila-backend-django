@@ -113,7 +113,7 @@ class CorporateAdminTests(TestCase):
         self.assertEqual(approval.status, ApprovalStatus.APPROVED)
 
     def test_analytics_dashboard_endpoint(self):
-        url = reverse('centelized-analytics-dashboard')
+        url = reverse('corporate-analytics-dashboard')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("metrics", response.data)
@@ -121,3 +121,29 @@ class CorporateAdminTests(TestCase):
         self.assertIn("leads_pipeline", response.data)
         self.assertIn("recent_activities", response.data)
         self.assertEqual(response.data['metrics']['total_employees'], 1)
+
+    def test_onboarding_sign_off_auto_provisioning(self):
+        from .models import Candidate, Onboarding, OnboardingStatus, CandidateStage
+        candidate = Candidate.objects.create(
+            organization=self.org,
+            full_name="Elena Gilbert",
+            email="elena.gilbert@test.com",
+            phone="+123456789",
+            position="VP of Human Resources",
+            department=self.dept,
+            stage=CandidateStage.ONBOARDING
+        )
+        onboarding = Onboarding.objects.create(
+            organization=self.org,
+            candidate=candidate,
+            department=self.dept,
+            status=OnboardingStatus.IN_PROGRESS
+        )
+        url = reverse('onboarding-sign-off', args=[onboarding.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        onboarding.refresh_from_db()
+        self.assertEqual(onboarding.status, OnboardingStatus.COMPLETED)
+        self.assertIsNotNone(onboarding.employee)
+        self.assertEqual(onboarding.employee.profile.email, "elena.gilbert@test.com")
+

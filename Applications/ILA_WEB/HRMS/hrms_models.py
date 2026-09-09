@@ -19,6 +19,10 @@ def generate_req_id():
     return f"REQ-{uuid.uuid4().hex[:6]}"
 
 
+# Forward canonical models from blueprint
+from Applications.ILA_WEB.models import AttendanceLog, EnterpriseTask, ApprovalRequest  # noqa: E402
+
+
 class StaffProfile(models.Model):
     STATUS_CHOICES = [
         ('Active', 'Active'),
@@ -46,28 +50,7 @@ class StaffProfile(models.Model):
         ordering = ['employee_id']
 
     def __str__(self):
-        return f"{self.user.fullname or self.user.username} ({self.employee_id}) - {self.department}"
-
-
-class AttendanceLog(models.Model):
-    STATUS_CHOICES = [
-        ('Present', 'Present'),
-        ('On Leave', 'On Leave'),
-        ('Late', 'Late'),
-    ]
-
-    id = models.CharField(max_length=50, primary_key=True, default=generate_att_id)
-    staff = models.ForeignKey(StaffProfile, on_delete=models.CASCADE, related_name='attendance_logs')
-    date = models.DateField(db_index=True)
-    check_in_time = models.CharField(max_length=50, blank=True)
-    check_out_time = models.CharField(max_length=50, blank=True)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Present')
-
-    class Meta:
-        ordering = ['-date']
-
-    def __str__(self):
-        return f"{self.staff.employee_id} on {self.date}: {self.status}"
+        return f"{self.user.get_full_name() or self.user.username} ({self.employee_id}) - {self.department}"
 
 
 class HRCandidate(models.Model):
@@ -105,64 +88,3 @@ class HRCandidate(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.position} ({self.stage})"
-
-
-class EnterpriseTask(models.Model):
-    STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('In Progress', 'In Progress'),
-        ('Success', 'Success'),
-        ('Negative', 'Negative'),
-    ]
-
-    PRIORITY_CHOICES = [
-        ('High', 'High'),
-        ('Medium', 'Medium'),
-        ('Low', 'Low'),
-    ]
-
-    id = models.CharField(max_length=50, primary_key=True, default=generate_task_id)
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    assigned_to_dept = models.CharField(max_length=100)
-    assigned_staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tasks')
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Pending')
-    priority = models.CharField(max_length=50, choices=PRIORITY_CHOICES, default='Medium')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"[{self.priority}] {self.title} ({self.status})"
-
-
-class ApprovalRequest(models.Model):
-    REQUEST_TYPE_CHOICES = [
-        ('New Staff', 'New Staff'),
-        ('New Course', 'New Course'),
-        ('Data Edit', 'Data Edit'),
-        ('Deletion', 'Deletion'),
-        ('General', 'General'),
-    ]
-
-    STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Approved', 'Approved'),
-        ('Rejected', 'Rejected'),
-    ]
-
-    id = models.CharField(max_length=50, primary_key=True, default=generate_req_id)
-    request_type = models.CharField(max_length=50, choices=REQUEST_TYPE_CHOICES, default='General')
-    description = models.TextField()
-    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='submitted_requests')
-    department = models.CharField(max_length=100)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Pending')
-    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_requests')
-    date = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-date']
-
-    def __str__(self):
-        return f"{self.request_type} from {self.department}: {self.status}"
