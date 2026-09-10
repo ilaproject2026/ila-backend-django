@@ -1,17 +1,24 @@
 import logging
+import uuid
 from django.conf import settings
 from rest_framework.views import APIView
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from django.db.models import Sum, Count
+from django.db import transaction
 import google.generativeai as genai
 
-from .serializers import ConsultantChatRequestSerializer, ConsultantChatResponseSerializer
+from .serializers import (
+    ConsultantChatRequestSerializer, ConsultantChatResponseSerializer,
+    ConsultantChatMessageSerializer, ConsultantSessionSerializer, ConsultantChatInputSerializer
+)
 from .prompts import ILA_CONSULTANT_SYSTEM_INSTRUCTION
 from .models import AITokenUsageLog
+from ..models import ConsultantSession, ConsultantChatMessage, Inquiry
 
 logger = logging.getLogger(__name__)
 
@@ -229,3 +236,124 @@ class TokenAnalyticsSummaryView(APIView):
                 "inr": round(est_cost_inr, 2)
             }
         })
+
+
+class ConsultantChatAPIView(APIView):
+    """
+    POST /api/v1/consultant/chat/
+    Tracks the session, saves incoming user messages, and returns the session state.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ConsultantChatInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        session_key = data.get('session_id') or str(uuid.uuid4())
+        topic = data.get('topic', 'general')
+        user_message_text = data.get('message')
+
+        # 1. Retrieve or Create Chat Session
+        session, created = ConsultantSession.objects.get_or_create(
+            session_key=session_key,
+            defaults={
+                'user': request.user if request.user.is_authenticated else None,
+                'user_email': data.get('user_email') or (request.user.email if request.user.is_authenticated else ''),
+                'user_phone': data.get('user_phone', ''),
+                'user_name': data.get('user_name', ''),
+                'initial_topic': topic,
+                'current_topic': topic,
+                'ip_address': request.META.get('REMOTE_ADDR'),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:255],
+            }
+        )
+        if not created and topic != session.current_topic:
+            session.current_topic = topic
+            session.save(update_fields=['current_topic', 'last_activity'])
+
+        # 2. Save incoming User Message
+        user_message = ConsultantChatMessage.objects.create(
+            session=session,
+            role='user',
+            content=user_message_text
+        )
+
+        # 3. Update Session Stats
+        session.total_messages = session.messages.count()
+        session.save(update_fields=['total_messages', 'last_activity'])
+
+        return Response({
+            'session_id': session.session_key,
+            'topic': session.current_topic,
+            'status': 'received',
+            'message': ConsultantChatMessageSerializer(user_message).data,
+            'total_messages': session.total_messages,
+            'reply': None,
+        }, status=status.HTTP_200_OK)
+
+
+class ConsultantSessionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    GET /api/v1/consultant/sessions/
+    GET /api/v1/consultant/sessions/{session_key}/
+    GET /api/v1/consultant/sessions/{session_key}/history/
+    """
+    queryset = ConsultantSession.objects.all().prefetch_related('messages')
+    serializer_class = ConsultantSessionSerializer
+    lookup_field = 'session_key'
+    permission_classes = [AllowAny]  # Visitors can fetch their own session by key
+
+    @action(detail=True, methods=['get'])
+    def history(self, request, session_key=None):
+        session = self.get_object()
+        serializer = ConsultantChatMessageSerializer(session.messages.all(), many=True)
+        return Response({
+            'session_id': session.session_key,
+            'topic': session.current_topic,
+            'status': session.status,
+            'messages': serializer.data
+        })
+
+    @action(detail=True, methods=['post'], url_path='convert-to-inquiry')
+    def convert_to_inquiry(self, request, session_key=None):
+        """
+        POST /api/v1/consultant/sessions/{session_key}/convert-to-inquiry/
+        Converts active chat lead directly into CRM front office Inquiry record!
+        """
+        session = self.get_object()
+        name = request.data.get('name') or session.user_name or 'Live Consultant Lead'
+        email = request.data.get('email') or session.user_email
+        phone = request.data.get('phone') or session.user_phone
+
+        if not email and not phone:
+            return Response({'error': 'Email or phone required to create inquiry.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        category_map = {
+            'visa': 'Visa',
+            'jobs': 'Jobs',
+            'arrival': 'General Front Office',
+            'housing': 'Study Abroad',
+            'general': 'General Front Office'
+        }
+
+        inquiry = Inquiry.objects.create(
+            name=name,
+            email=email or 'lead@ilaglobal.com',
+            phone=phone or 'N/A',
+            type='Online',
+            category=category_map.get(session.current_topic, 'General Front Office'),
+            crm_status='New Lead',
+            pipeline_stage='Intake',
+        )
+
+        session.inquiry = inquiry
+        session.status = 'converted_to_lead'
+        session.save(update_fields=['inquiry', 'status'])
+
+        return Response({
+            'success': True,
+            'inquiry_id': str(inquiry.id),
+            'message': 'Session converted to CRM lead successfully.'
+        })
+

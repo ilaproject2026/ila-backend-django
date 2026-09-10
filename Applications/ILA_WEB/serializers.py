@@ -6,7 +6,8 @@ from .models import (
     PartnerInstitution, TieUpOutreachLog, MarketingCampaign,
     FieldVisitLog, DepartmentMeeting, RewardProfile, RewardTransaction,
     WorkStudyApplication, VisaRequirementRule, SettlementServiceRequest,
-    EnterpriseTask, AttendanceLog, ApprovalRequest
+    EnterpriseTask, AttendanceLog, ApprovalRequest,
+    ConsultantSession, ConsultantChatMessage
 )
 
 User = get_user_model()
@@ -64,6 +65,18 @@ class InquirySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inquiry
         fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'token_number': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'resume_url': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'keywords': {'required': False},
+            'section_data': {'required': False},
+        }
+
+    # def create(self, validated_data):
+    #     print("validated_data", validated_data)
+    #     inquiry = Inquiry.objects.create(**validated_data)
+    #     return inquiry
 
 
 class PartnerInstitutionSerializer(serializers.ModelSerializer):
@@ -162,3 +175,36 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApprovalRequest
         fields = '__all__'
+
+
+# ==============================================================================
+# LIVE CONSULTANT & CHAT SESSION SERIALIZERS
+# ==============================================================================
+class ConsultantChatMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsultantChatMessage
+        fields = ['id', 'role', 'content', 'suggested_actions', 'timestamp', 'total_tokens']
+
+
+class ConsultantSessionSerializer(serializers.ModelSerializer):
+    messages = ConsultantChatMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ConsultantSession
+        fields = [
+            'id', 'session_key', 'user', 'user_email', 'user_phone', 'user_name',
+            'initial_topic', 'current_topic', 'status', 'total_messages',
+            'total_tokens_used', 'inquiry', 'last_activity', 'created_at', 'messages'
+        ]
+        read_only_fields = ['id', 'total_messages', 'total_tokens_used', 'last_activity', 'created_at']
+
+
+class ConsultantChatInputSerializer(serializers.Serializer):
+    session_id = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    message = serializers.CharField(required=True)
+    topic = serializers.CharField(required=False, default='general')
+    history = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    user_email = serializers.EmailField(required=False, allow_blank=True)
+    user_phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    user_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+

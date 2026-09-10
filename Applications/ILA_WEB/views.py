@@ -137,10 +137,17 @@ class FranchiseViewSet(viewsets.ModelViewSet):
 class InquiryViewSet(viewsets.ModelViewSet):
     queryset = Inquiry.objects.all().order_by('-created_at')
     serializer_class = InquirySerializer
-    permission_classes = [permissions.AllowAny]  # Allow public intake from website/landing pages
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['category', 'payment_status', 'crm_status', 'type', 'pipeline_stage']
-    search_fields = ['name', 'email', 'phone', 'course', 'token_number']
+    filterset_fields = ['category', 'payment_status', 'crm_status', 'target_country', 'target_keyword', 'department']
+    search_fields = ['name', 'email', 'phone', 'course', 'target_keyword', 'token_number']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'ai_score', 'category', 'crm_status']
+
+    def get_permissions(self):
+        # Public users can submit an intake application without logging in
+        if self.action == 'create':
+            return [permissions.AllowAny()]
+        # All administrative CRM actions require authentication
+        return [permissions.IsAuthenticated()]
 
 
 class FollowUpRecordViewSet(viewsets.ModelViewSet):
@@ -266,3 +273,8 @@ class ApprovalViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['department', 'status', 'type']
     search_fields = ['requested_by', 'description']
+
+
+# Live Consultant Chat views
+from .IlaConsultant.views import ConsultantChatAPIView, ConsultantSessionViewSet
+

@@ -44,21 +44,8 @@ class Inquiry(models.Model):
         ('Rewards', 'Rewards Program & Consultant'),
         ('General Front Office', 'General Front Office Reception'),
     ]
-    PAYMENT_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Contacted', 'Contacted'),
-        ('Partially Paid', 'Partially Paid'),
-        ('Paid', 'Paid'),
-        ('Link Sent', 'Link Sent'),
-        ('Refunded', 'Refunded'),
-    ]
-    CRM_STATUS_CHOICES = [
-        ('New Lead', 'New Lead'),
-        ('In Progress', 'In Progress'),
-        ('Closed Won', 'Closed Won'),
-        ('Closed Lost', 'Closed Lost'),
-    ]
 
+    # Core Lead & Identification
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField()
@@ -68,30 +55,82 @@ class Inquiry(models.Model):
         default='Online',
         choices=[('Walk-in', 'Walk-in'), ('Online', 'Online'), ('Referral', 'Referral'), ('Phone', 'Phone')]
     )
-    token_number = models.CharField(max_length=50, blank=True, null=True)
-    
+    token_number = models.CharField(max_length=50, blank=True, null=True, unique=True)
+
+    # Section & Routing
+    category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, default='General Front Office')
+    department = models.CharField(max_length=100, blank=True, null=True)
+
+    # Contextual Keyword & Section Tracking
+    target_keyword = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text="Primary keyword/title (e.g., 'Opportunity Card', 'Senior React Dev')"
+    )
+    keywords = models.JSONField(
+        default=list, blank=True,
+        help_text="Searchable tag list extracted from incoming redirection"
+    )
+    source_page = models.CharField(
+        max_length=150, blank=True, null=True,
+        help_text="Page from which applicant arrived (e.g., 'VisaPage', 'JobsPage')"
+    )
+    source_url = models.CharField(
+        max_length=500, blank=True, null=True,
+        help_text="Full origin URL/hash including query parameters"
+    )
+
+    # Structured Section Data (Complete snapshot of form state)
+    section_data = models.JSONField(
+        default=dict, blank=True,
+        help_text="All section-specific form fields (batches, tracks, tiers, etc.)"
+    )
+
+    # Normalized Quick-Filter Columns
     course = models.CharField(max_length=255, blank=True, null=True)
     path = models.CharField(max_length=255, blank=True, null=True)
     batch = models.CharField(max_length=255, blank=True, null=True)
     slot = models.CharField(max_length=255, blank=True, null=True)
-    price = models.CharField(max_length=50, default='$199')
-    
-    category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, default='General Front Office')
-    payment_status = models.CharField(max_length=50, choices=PAYMENT_CHOICES, default='Pending')
-    crm_status = models.CharField(max_length=50, choices=CRM_STATUS_CHOICES, default='New Lead')
+    target_country = models.CharField(max_length=100, blank=True, null=True)
+    visa_type = models.CharField(max_length=150, blank=True, null=True)
+    job_role = models.CharField(max_length=150, blank=True, null=True)
+    resume_url = models.URLField(max_length=500, blank=True, null=True)
+    reward_tier = models.CharField(max_length=100, blank=True, null=True)
+    referral_code = models.CharField(max_length=100, blank=True, null=True)
+
+    # CRM Pipeline & Operational Fields
+    payment_status = models.CharField(max_length=50, default='Pending')
+    crm_status = models.CharField(max_length=50, default='New Lead')
     pipeline_stage = models.CharField(max_length=50, default='Intake')
-    
+    price = models.CharField(max_length=50, default='Pending Consultation')
+    ai_score = models.IntegerField(null=True, blank=True)
+    ai_path = models.CharField(max_length=255, blank=True, null=True)
+
+    # Operational/Staff Tracking
     assigned_staff_id = models.CharField(max_length=50, blank=True, null=True)
     assigned_staff_name = models.CharField(max_length=255, blank=True, null=True)
     follow_up_date = models.CharField(max_length=50, blank=True, null=True)
     follow_up_status = models.CharField(max_length=50, blank=True, null=True)
     visa_processing_stage = models.CharField(max_length=100, blank=True, null=True)
-    
+
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['category', 'crm_status']),
+            models.Index(fields=['target_keyword']),
+            models.Index(fields=['email']),
+        ]
+
     def __str__(self):
         return f"{self.name} - {self.category} ({self.payment_status})"
+
+    def save(self, *args, **kwargs):
+        if not self.token_number:
+            self.token_number = f"INQ-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
 
 
 class FollowUpRecord(models.Model):
@@ -402,4 +441,75 @@ class ApprovalRequest(models.Model):
 
     def __str__(self):
         return f"{self.type} by {self.requested_by} ({self.status})"
+
+
+# ==============================================================================
+# 9. LIVE CONSULTANT & CHAT SESSION TRACKING
+# ==============================================================================
+class ConsultantSession(models.Model):
+    STATUS_CHOICES = [
+        ('active', 'Active Session'),
+        ('resolved', 'Resolved / Closed'),
+        ('converted_to_lead', 'Converted to CRM Inquiry'),
+        ('abandoned', 'Abandoned'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session_key = models.CharField(max_length=128, unique=True, db_index=True, help_text="Client session token or UUID")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='consultant_sessions')
+    user_email = models.EmailField(blank=True, null=True)
+    user_phone = models.CharField(max_length=50, blank=True, null=True)
+    user_name = models.CharField(max_length=150, blank=True, null=True)
+    
+    initial_topic = models.CharField(max_length=50, default='general')
+    current_topic = models.CharField(max_length=50, default='general')
+    
+    # Metadata & Tracking
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    source_url = models.URLField(blank=True, null=True)
+    
+    # CRM Integration Link
+    inquiry = models.ForeignKey('Inquiry', on_delete=models.SET_NULL, null=True, blank=True, related_name='consultant_sessions')
+    
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='active')
+    total_messages = models.PositiveIntegerField(default=0)
+    total_tokens_used = models.PositiveIntegerField(default=0)
+    
+    last_activity = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-last_activity']
+
+    def __str__(self):
+        user_identifier = self.user_email or (self.user.username if self.user else 'Guest')
+        return f"Session {self.session_key[:8]} ({user_identifier}) - {self.current_topic}"
+
+
+class ConsultantChatMessage(models.Model):
+    ROLE_CHOICES = [
+        ('user', 'User / Visitor'),
+        ('assistant', 'Ilas AI Consultant'),
+        ('system', 'System Prompt / Note'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(ConsultantSession, on_delete=models.CASCADE, related_name='messages')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    suggested_actions = models.JSONField(default=list, blank=True)
+    
+    # AI Token Telemetry
+    prompt_tokens = models.PositiveIntegerField(default=0)
+    completion_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
+    
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"[{self.role}] {self.content[:40]} ({self.timestamp:%H:%M:%S})"
 

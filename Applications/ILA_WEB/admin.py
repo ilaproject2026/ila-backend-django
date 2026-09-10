@@ -16,6 +16,8 @@ from .models import (
     EnterpriseTask,
     AttendanceLog,
     ApprovalRequest,
+    ConsultantSession,
+    ConsultantChatMessage,
 )
 
 from .IlaConsultant.admin import AITokenUsageLogAdmin  # noqa: F401
@@ -29,9 +31,9 @@ class FranchisePartnerAdmin(admin.ModelAdmin):
 
 @admin.register(Inquiry)
 class InquiryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'phone', 'category', 'type', 'course', 'payment_status', 'crm_status', 'pipeline_stage', 'created_at')
-    list_filter = ('category', 'type', 'payment_status', 'crm_status', 'pipeline_stage')
-    search_fields = ('name', 'email', 'phone', 'course', 'token_number')
+    list_display = ('name', 'email', 'phone', 'category', 'department', 'target_keyword', 'target_country', 'payment_status', 'crm_status', 'pipeline_stage', 'created_at')
+    list_filter = ('category', 'department', 'type', 'payment_status', 'crm_status', 'pipeline_stage', 'target_country')
+    search_fields = ('name', 'email', 'phone', 'course', 'target_keyword', 'token_number')
 
 
 @admin.register(FollowUpRecord)
@@ -129,3 +131,32 @@ class ApprovalRequestAdmin(admin.ModelAdmin):
     list_display = ('type', 'requested_by', 'department', 'status', 'date')
     list_filter = ('department', 'status', 'type')
     search_fields = ('requested_by', 'description')
+
+
+class ConsultantChatMessageInline(admin.TabularInline):
+    model = ConsultantChatMessage
+    extra = 0
+    readonly_fields = ('role', 'content', 'suggested_actions', 'prompt_tokens', 'completion_tokens', 'total_tokens', 'timestamp')
+    can_delete = False
+
+
+@admin.register(ConsultantSession)
+class ConsultantSessionAdmin(admin.ModelAdmin):
+    list_display = ('session_key', 'user_email', 'user_name', 'current_topic', 'status', 'total_messages', 'total_tokens_used', 'last_activity', 'created_at')
+    list_filter = ('status', 'current_topic', 'created_at')
+    search_fields = ('session_key', 'user_email', 'user_name', 'user_phone')
+    readonly_fields = ('id', 'created_at', 'last_activity', 'total_messages', 'total_tokens_used')
+    inlines = [ConsultantChatMessageInline]
+
+
+@admin.register(ConsultantChatMessage)
+class ConsultantChatMessageAdmin(admin.ModelAdmin):
+    list_display = ('session', 'role', 'short_content', 'total_tokens', 'timestamp')
+    list_filter = ('role', 'timestamp')
+    search_fields = ('content', 'session__session_key')
+    readonly_fields = ('id', 'timestamp')
+
+    def short_content(self, obj):
+        return obj.content[:60] + ('...' if len(obj.content) > 60 else '')
+    short_content.short_description = 'Content'
+
