@@ -61,3 +61,4 @@ tzdata==2026.3
 uritemplate==4.2.0
 urllib3==2.7.0
 websockets==16.1.1
+dj-database-url
