@@ -31,7 +31,7 @@ DEBUG = dtconfig("DEBUG", default=True)
 ALLOWED_HOSTS = ['*']
 
 # Gemini API Key Configuration
-GEMINI_API_KEY = dtconfig('GEMINI_API_KEY', default=os.getenv('GEMINI_API_KEY', ''))
+GEMINI_API_KEY = dtconfig('GEMINI_API_KEY', default='')
 
 
 # Application definition
@@ -205,13 +205,13 @@ REST_FRAMEWORK = {
 }
 
 # Celery Configuration for Background Notifications & Outreach
-CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = dtconfig('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = dtconfig('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 # Biometric & Security Gate Master Override PIN
-BIOMETRIC_SECURITY_PIN = os.getenv('BIOMETRIC_SECURITY_PIN', '7890')
+BIOMETRIC_SECURITY_PIN = dtconfig('BIOMETRIC_SECURITY_PIN', default='7890')
 
 
 
@@ -292,4 +292,4 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
-GEMINI_API_KEY = dtconfig('GEMINI_API_KEY')
+GEMINI_API_KEY = dtconfig('GEMINI_API_KEY', default='')
