@@ -34,11 +34,11 @@ router.register(r'department-meetings', DepartmentMeetingViewSet, basename='depa
 router.register(r'reward-transactions', RewardTransactionViewSet, basename='reward-transactions')
 
 urlpatterns = [
-    # Authentication Endpoints (Part 6 & 7)
-    path('auth/login/', CustomLoginView.as_view(), name='token_obtain_pair'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('auth/register/', RegisterView.as_view(), name='auth_register'),
-    path('auth/me/', CurrentUserView.as_view(), name='current_user'),
+    # Authentication Endpoints are managed centrally by Applications.Authentication
+    # path('auth/login/', CustomLoginView.as_view(), name='token_obtain_pair'),
+    # path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # path('auth/register/', RegisterView.as_view(), name='auth_register'),
+    # path('auth/me/', CurrentUserView.as_view(), name='current_user'),
 
     # Live AI Consultant Endpoints (Gemini Live Consultant)
     path('consultant/', include('Applications.ILA_WEB.IlaConsultant.urls')),

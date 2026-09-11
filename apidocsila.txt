@@ -1,0 +1,2673 @@
+================================================================================
+ILA ACADEMY GLOBAL WEB (ILA_WEB) BACKEND FULL API SPECIFICATION & REFERENCE
+================================================================================
+Target System: ILA Academy Global Web & Enterprise Portal (Applications.ILA_WEB)
+Backend Framework: Django 6.x + Django REST Framework (DRF) 3.15+
+Authentication Protocol: SimpleJWT Bearer Authentication + Biometric Override Token
+Primary API Namespace: /api/v1/ (with legacy /api/ routing fallback)
+Generated: September 2026
+Documentation File: apidocsila.txt
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. SYSTEM ARCHITECTURE & ENVIRONMENT CONFIGURATION
+   1.1 Base URLs & Environments
+   1.2 Global Request & Response Headers
+   1.3 Authentication Protocol & Token Lifecycle (SimpleJWT)
+   1.4 Biometric Security Gate Token System (Level 1 Master Override)
+   1.5 Multi-Tier RBAC & Permission Classes
+   1.6 Query Parameter Standards (Pagination, Filtering, Search, Ordering)
+   1.7 Standard Error Response Structures & HTTP Status Codes
+
+2. AUTHENTICATION & USER MANAGEMENT ENDPOINTS
+   2.1 POST /api/v1/auth/login/ (CustomTokenObtainPairView)
+   2.2 POST /api/v1/auth/token/refresh/ (TokenRefreshView)
+   2.3 POST /api/v1/auth/register/ (RegisterView with Rewards Auto-Provisioning)
+   2.4 GET  /api/v1/auth/me/ (CurrentUserView)
+   2.5 GET, POST, PUT, PATCH, DELETE /api/v1/staff/ (StaffViewSet)
+
+3. LIVE AI CONSULTANT ("ILAS") & CONVERSATIONAL INTELLIGENCE
+   3.1 Architecture & Gemini LLM Pipeline
+   3.2 POST /api/v1/consultant/chat/ (ConsultantChatAPIView - Session & Chat Tracking)
+   3.3 POST /api/v1/consultant/legacy-chat/ (ConsultantChatView - Direct Gemini Inference & Fallback)
+   3.4 GET  /api/v1/consultant/tokens/summary/ (TokenAnalyticsSummaryView - Token & Cost Telemetry)
+   3.5 GET  /api/v1/consultant/sessions/ (ConsultantSessionViewSet - Active Sessions List)
+   3.6 GET  /api/v1/consultant/sessions/{session_key}/ (Retrieve Session Details)
+   3.7 GET  /api/v1/consultant/sessions/{session_key}/history/ (Retrieve Message Transcript)
+   3.8 POST /api/v1/consultant/sessions/{session_key}/convert-to-inquiry/ (Lead Conversion to CRM)
+   3.9 URL Aliases (/api/v1/ila-consultant/...)
+
+4. OMNICHANNEL INTAKE DESK & CRM PIPELINE (FRONT OFFICE)
+   4.1 GET, POST /api/v1/inquiries/ (InquiryViewSet - Public Intake & Admin CRM)
+   4.2 GET, PUT, PATCH, DELETE /api/v1/inquiries/{id}/ (Inquiry Details & Lifecycle Management)
+   4.3 GET, POST, PUT, PATCH, DELETE /api/v1/follow-ups/ (FollowUpRecordViewSet)
+
+5. FRANCHISE PARTNER & REGIONAL AGENT NETWORK
+   5.1 GET, POST /api/v1/franchises/ (FranchiseViewSet - Franchise Registry)
+   5.2 GET, PUT, PATCH, DELETE /api/v1/franchises/{id}/ (Franchise Partner Operations)
+
+6. GLOBAL PARTNER INSTITUTIONS & AI TIE-UP ENGINE
+   6.1 GET, POST /api/v1/partners/ (PartnerInstitutionViewSet - Universities, Employers, Hospitals)
+   6.2 GET, PUT, PATCH, DELETE /api/v1/partners/{id}/ (Partner Profile Management)
+   6.3 GET, POST, PUT, PATCH, DELETE /api/v1/outreach-logs/ (TieUpOutreachLogViewSet - AI Outreach & MOU)
+
+7. MARKETING STUDIO, FIELD OPERATIONS & STRATEGIC MEETINGS
+   7.1 GET, POST /api/v1/campaigns/ (MarketingCampaignViewSet - Multi-channel Ads & Dynamic ROI)
+   7.2 GET, PUT, PATCH, DELETE /api/v1/campaigns/{id}/ (Campaign Lifecycle)
+   7.3 GET, POST, PUT, PATCH, DELETE /api/v1/field-visits/ (FieldVisitLogViewSet - Institutional Visits)
+   7.4 GET, POST, PUT, PATCH, DELETE /api/v1/department-meetings/ (DepartmentMeetingViewSet - Internal Agendas)
+
+8. REWARDS PROGRAM & JUNIOR CONSULTANT NETWORK
+   8.1 Dual-Account Architecture & Gamified Milestone Engine
+   8.2 GET, POST /api/v1/rewards/ (RewardProfileViewSet - Consultant Profiles & Points)
+   8.3 GET, PUT, PATCH, DELETE /api/v1/rewards/{id}/ (Profile Adjustments & Level Management)
+   8.4 GET, POST, PUT, PATCH, DELETE /api/v1/reward-transactions/ (RewardTransactionViewSet - Ledger)
+
+9. WORK WHILE STUDY & AI PRELIMINARY INTERVIEWS
+   9.1 Career Pathway System (India / Abroad / German Placement / Rewards)
+   9.2 GET, POST /api/v1/work-study-applications/ (WorkStudyApplicationViewSet - Candidate Applications)
+   9.3 GET, PUT, PATCH, DELETE /api/v1/work-study-applications/{id}/ (AI Scoring & HR Stages)
+
+10. DYNAMIC VISA REQUIREMENTS & IMMIGRATION CONCIERGE
+    10.1 GET, POST /api/v1/visa-rules/ (VisaRequirementRuleViewSet - Country/Visa Rules)
+    10.2 GET, PUT, PATCH, DELETE /api/v1/visa-rules/{id}/ (Rule Updates)
+    10.3 GET, POST /api/v1/settlement-requests/ (SettlementServiceViewSet - Post-Arrival Concierge)
+    10.4 GET, PUT, PATCH, DELETE /api/v1/settlement-requests/{id}/ (Coordinator Assignment & Status)
+
+11. CORE ENTERPRISE OPERATIONS & HRMS
+    11.1 GET, POST, PUT, PATCH, DELETE /api/v1/tasks/ (EnterpriseTaskViewSet - Task Board)
+    11.2 GET, POST, PUT, PATCH, DELETE /api/v1/attendance/ (AttendanceViewSet - Attendance Logs)
+    11.3 GET, POST, PUT, PATCH, DELETE /api/v1/approvals/ (ApprovalViewSet - Multi-tier Signoffs)
+
+12. MODULAR SPECIALIZED SUBSYSTEMS REFERENCE
+    12.1 Academics Subsystem (Categories, Teaching/Analyzing Strategies, Courses, Batches, Timetable, Materials, Enrollments)
+    12.2 Finance Subsystem (Ledgers, Sales, Funds, Commissions)
+    12.3 FrontOffice Subsystem (Inquiries, Visitor Logs)
+    12.4 HRMS Subsystem (Staff Profiles, Candidates, Tasks, Approvals, Payroll Sync)
+    12.5 Rewards Subsystem (Referral Records, Tier Rules)
+    12.6 AI Engine Subsystem (Curriculum Generator, Eligibility Checker, Classroom Tutor, Resume Parser)
+
+13. COMPLETE TYPESCRIPT DATA INTERFACES (FRONTEND DTOs)
+14. INTEGRATION SNIPPETS & CLIENT HOOKS (Axios, React Hook, cURL)
+15. ERROR CODES & PRODUCTION TROUBLESHOOTING RUNBOOK
+
+
+================================================================================
+1. SYSTEM ARCHITECTURE & ENVIRONMENT CONFIGURATION
+================================================================================
+
+1.1 Base URLs & Environments
+----------------------------
+- Local Development:
+    http://127.0.0.1:8000/api/v1/
+- Local Alternate/Legacy Mount:
+    http://127.0.0.1:8000/api/
+- Staging Environment:
+    https://staging-api.ilaglobal.edu/api/v1/
+- Production Environment:
+    https://api.ilaglobal.edu/api/v1/
+
+All endpoints in this specification are mounted under the `/api/v1/` prefix.
+
+1.2 Global Request & Response Headers
+-------------------------------------
+- Content-Type: application/json (or multipart/form-data for resume/file uploads)
+- Accept: application/json
+- Authorization: Bearer <JWT_ACCESS_TOKEN> (Required for authenticated endpoints)
+- X-Biometric-Token: <PIN> (Optional: Used for Level 1 master security gate override, default: "7890" or "ILA2026")
+
+1.3 Authentication Protocol & Token Lifecycle (SimpleJWT)
+---------------------------------------------------------
+- Protocol: JSON Web Token (JWT) via rest_framework_simplejwt
+- Access Token Lifetime: 60 minutes (Default, signed with HMAC-SHA256)
+- Refresh Token Lifetime: 7 days
+- Token Renewal: Send POST request to `/api/v1/auth/token/refresh/` with `{"refresh": "<token>"}` to receive a new access token.
+
+1.4 Biometric Security Gate Token System
+----------------------------------------
+ILA Enterprise enforces an out-of-band biometric authentication header for sensitive Level 1 overrides (e.g. system administration, high-risk financial transfers, executive approvals).
+- Header Name: `X-Biometric-Token`
+- Accepted System PINs: Defined in settings (`BIOMETRIC_SECURITY_PIN`), default fallbacks `7890` or `ILA2026`.
+- User State: If the user has `is_biometric_authorized=True`, the permission class `HasBiometricAuthorization` evaluates to `True` even without the header.
+
+1.5 Multi-Tier RBAC & Permission Classes
+----------------------------------------
+The system classifies users into 8 distinct roles:
+1. Super Admin: Full unconstrained system read/write access across all modules.
+2. CEO / General Manager: Executive command, enterprise approvals, high-level reporting.
+3. Department HOD (Head of Department): Department-scoped management, approvals, staff oversight.
+4. HR Manager: HRMS, candidate hiring, payroll sync, employee records.
+5. Marketing Exec: Marketing campaigns, leads analytics, outreach tracking.
+6. Academic Counselor: Inquiry intake, course enrollments, student guidance.
+7. Franchise Partner: Regional branch leads, sub-franchise analytics.
+8. Student / Junior Consultant: Public course intake, gamified rewards, work-study applications.
+
+Available Custom Permission Classes (`Applications.ILA_WEB.permissions`):
+- `IsSuperAdminUser`: Checks `is_superuser=True` or `role == 'Super Admin'`.
+- `IsCEOOrGM`: Checks `role in ['Super Admin', 'CEO', 'General Manager']`.
+- `IsDepartmentHOD`: Checks `'HOD' in role` or executive/HR/marketing management roles.
+- `HasBiometricAuthorization`: Validates `X-Biometric-Token` header or `is_biometric_authorized=True`.
+
+1.6 Query Parameter Standards (Pagination, Filtering, Search, Ordering)
+------------------------------------------------------------------------
+All DRF ViewSets support standard query parameters:
+- Search: `?search=<term>` (Performs case-insensitive containment lookup on designated fields)
+- Ordering: `?ordering=<field>` (Ascending) or `?ordering=-<field>` (Descending)
+- Filtering: `?<field>=<value>` (Provided by DjangoFilterBackend)
+- Pagination: DRF PageNumberPagination (`?page=1&page_size=20`)
+
+1.7 Standard Error Response Structures & HTTP Status Codes
+----------------------------------------------------------
+Success Codes:
+- 200 OK: Successful retrieval or update
+- 201 Created: Successful creation of a new entity
+- 204 No Content: Successful deletion
+
+Client Error Codes:
+- 400 Bad Request: Validation failure or missing required fields
+    {
+      "field_name": ["This field is required."],
+      "detail": "Descriptive validation message"
+    }
+- 401 Unauthorized: Missing, invalid, or expired JWT access token
+    {
+      "detail": "Given token not valid for any token type",
+      "code": "token_not_valid",
+      "messages": [{"token_class": "AccessToken", "token_type": "access", "message": "Token is invalid or expired"}]
+    }
+- 403 Forbidden: Authenticated user lacks permission to access or modify resource
+    {
+      "detail": "You do not have permission to perform this action."
+    }
+- 404 Not Found: Entity with specified ID does not exist
+    {
+      "detail": "Not found."
+    }
+- 429 Too Many Requests: Rate limit exceeded (e.g. 20 requests/minute on AI chat)
+    {
+      "detail": "Request was throttled. Expected available in XX seconds."
+    }
+
+
+================================================================================
+2. AUTHENTICATION & USER MANAGEMENT ENDPOINTS
+================================================================================
+
+2.1 POST /api/v1/auth/login/
+----------------------------
+View: CustomLoginView (subclasses TokenObtainPairView)
+Permissions: AllowAny
+Description: Authenticates user credentials (email or username + password), returns JWT tokens and an enriched user profile payload including role, department, and biometric authorization flag.
+
+Request Headers:
+  Content-Type: application/json
+
+Request Body:
+{
+  "username": "klaus.mueller",      // String, required (Can also be email depending on backend config)
+  "password": "Admin@123"           // String, required
+}
+
+Response (200 OK):
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 2,
+    "email": "klaus@ilaglobal.de",
+    "name": "Klaus Mueller",
+    "role": "Academic Counselor",
+    "department": "Academic",
+    "is_biometric_authorized": false
+  }
+}
+
+Response (401 Unauthorized):
+{
+  "detail": "No active account found with the given credentials"
+}
+
+
+2.2 POST /api/v1/auth/token/refresh/
+------------------------------------
+View: TokenRefreshView
+Permissions: AllowAny
+Description: Exchanges a valid JWT refresh token for a newly minted access token.
+
+Request Body:
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+Response (200 OK):
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+
+2.3 POST /api/v1/auth/register/
+-------------------------------
+View: RegisterView
+Permissions: AllowAny
+Description: Registers a new user (Staff, Candidate, or Student) and automatically provisions a dual-account in the Rewards Club (`RewardProfile`) with 100 starter bonus points and a unique Consultant ID (`ILA-JC-XXXX`).
+
+Request Body:
+{
+  "email": "arjun.sharma@example.com",     // String (Email), required
+  "password": "SecurePassword#2026",        // String, required
+  "full_name": "Arjun Sharma",              // String, optional (Parsed into first_name / last_name)
+  "first_name": "Arjun",                    // String, optional
+  "last_name": "Sharma",                    // String, optional
+  "role": "student",                        // String, default "student" (student, candidate, staff, etc.)
+  "department": "Study Abroad",             // String, optional
+  "phone": "+919876543210"                  // String, optional
+}
+
+Response (201 Created):
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 14,
+    "username": "arjun.sharma",
+    "email": "arjun.sharma@example.com",
+    "first_name": "Arjun",
+    "last_name": "Sharma",
+    "name": "Arjun Sharma",
+    "role": "student",
+    "department": "Study Abroad",
+    "phone": "+919876543210",
+    "hr_issued_id": null,
+    "status": "Active",
+    "hr_approval_status": "Approved",
+    "is_biometric_authorized": false
+  }
+}
+
+Response (400 Bad Request):
+{
+  "detail": "User with this email already exists."
+}
+
+
+2.4 GET /api/v1/auth/me/
+------------------------
+View: CurrentUserView
+Permissions: IsAuthenticated
+Description: Fetches the authenticated user's profile and credentials.
+
+Request Headers:
+  Authorization: Bearer <ACCESS_TOKEN>
+
+Response (200 OK):
+{
+  "id": 14,
+  "username": "arjun.sharma",
+  "email": "arjun.sharma@example.com",
+  "first_name": "Arjun",
+  "last_name": "Sharma",
+  "name": "Arjun Sharma",
+  "role": "student",
+  "department": "Study Abroad",
+  "phone": "+919876543210",
+  "hr_issued_id": null,
+  "status": "Active",
+  "hr_approval_status": "Approved",
+  "is_biometric_authorized": false
+}
+
+
+2.5 STAFF MANAGEMENT: /api/v1/staff/
+------------------------------------
+View: StaffViewSet
+Permissions: IsAuthenticated
+Model: CustomUser (get_user_model())
+Serializer: UserSerializer
+Filter Fields: `role`, `department`, `status`, `is_biometric_authorized`
+Search Fields: `username`, `email`, `first_name`, `last_name`, `phone`, `hr_issued_id`
+Ordering: `-id` (default)
+
+Available Methods:
+- GET    /api/v1/staff/             (List staff with filtering and search)
+- POST   /api/v1/staff/             (Create a new user/staff member)
+- GET    /api/v1/staff/{id}/        (Retrieve specific staff profile)
+- PUT    /api/v1/staff/{id}/        (Full update of staff profile)
+- PATCH  /api/v1/staff/{id}/        (Partial update, e.g. update status or biometric authorization)
+- DELETE /api/v1/staff/{id}/        (Delete user record)
+
+Sample Query:
+  GET /api/v1/staff/?role=Academic Counselor&department=Academic&search=Klaus
+
+Sample Staff Response Object:
+{
+  "id": 2,
+  "username": "klaus.mueller",
+  "email": "klaus@ilaglobal.de",
+  "first_name": "Klaus",
+  "last_name": "Mueller",
+  "name": "Klaus Mueller",
+  "role": "Academic Counselor",
+  "department": "Academic",
+  "phone": "+49 30 1234567",
+  "hr_issued_id": "STAFF-001",
+  "status": "Active",
+  "hr_approval_status": "Approved",
+  "is_biometric_authorized": false
+}
+
+
+================================================================================
+3. LIVE AI CONSULTANT ("ILAS") & CONVERSATIONAL INTELLIGENCE
+================================================================================
+
+3.1 Architecture & Gemini LLM Pipeline
+--------------------------------------
+The Live AI Consultant module ("Ilas") provides automated, domain-aware advisory on:
+- German language courses (Goethe/TELC A1 to C2)
+- German Opportunity Card (Chancenkarte points, requirements, blocked funds)
+- Study in Germany & University Admissions (APS, Expatrio, Coracle)
+- Dual-vocational training (Ausbildung stipends and visa requirements)
+- Post-arrival housing (WG Zimmer), Anmeldung, and part-time jobs
+
+The backend utilizes Google Generative AI (`gemini-3.6-flash` / `gemini-1.5-flash`), with system instruction prompts grounded in ILA corporate standards, automated token audit logging (`AITokenUsageLog`), and smart fallback mechanisms for domain-specific queries if network or API limits are hit.
+
+Rate Limiting: 20 requests per minute per IP address.
+
+3.2 POST /api/v1/consultant/chat/
+---------------------------------
+View: ConsultantChatAPIView
+Permissions: AllowAny
+Description: Primary live chat endpoint. Creates or resumes a `ConsultantSession` based on `session_id`, records the incoming user message in `ConsultantChatMessage`, updates message counts, and links user identity.
+
+Request Body:
+{
+  "session_id": "c9b2e814-5f12-42b7-a3f1-d0b81e892c55", // String (UUID), optional (Generated if empty)
+  "message": "What are the requirements for German Opportunity Card?", // String, required
+  "topic": "jobs",                                        // String, optional (visa, jobs, housing, arrival, education, general)
+  "history": [],                                          // Array of {role, content}, optional
+  "user_email": "candidate@example.com",                 // String, optional
+  "user_phone": "+919876543210",                         // String, optional
+  "user_name": "Rohit Verma"                             // String, optional
+}
+
+Response (200 OK):
+{
+  "session_id": "c9b2e814-5f12-42b7-a3f1-d0b81e892c55",
+  "topic": "jobs",
+  "status": "received",
+  "message": {
+    "id": "e4f1a238-7182-4f33-8719-710283c74901",
+    "role": "user",
+    "content": "What are the requirements for German Opportunity Card?",
+    "suggested_actions": [],
+    "timestamp": "2026-09-11T14:30:00.000Z",
+    "total_tokens": 0
+  },
+  "total_messages": 1,
+  "reply": null
+}
+
+
+3.3 POST /api/v1/consultant/legacy-chat/
+----------------------------------------
+View: ConsultantChatView
+Permissions: AllowAny
+Description: Direct synchronous inference endpoint calling Google Gemini Flash. Formats dialogue history, persists token usage in `AITokenUsageLog`, and returns domain-specific action chips and text replies.
+
+Request Body:
+{
+  "message": "I want to apply for Chancenkarte. How many points do I need?",
+  "topic": "jobs",
+  "history": [
+    {"role": "user", "content": "Hi, I am looking to move to Germany."},
+    {"role": "model", "content": "Hello! ILA Academy specializes in pathways to Germany..."}
+  ],
+  "user_email": "candidate@example.com",
+  "user_phone": "+919876543210"
+}
+
+Response (200 OK):
+{
+  "reply": "The German Opportunity Card (Chancenkarte) is a points-based job search visa launched in June 2024. You need a minimum of 6 points based on criteria including qualifications, German (A2-B2) or English (C1), age (under 35 gets maximum points), work experience, and ties to Germany. You also need proof of funds (€1,027/month) or an €11,904 blocked account. Would you like our advisors to calculate your exact score?",
+  "topic": "jobs",
+  "suggested_actions": [
+    "Chancenkarte Evaluation",
+    "AI Resume Match",
+    "Ausbildung Programs"
+  ],
+  "usage": {
+    "prompt_tokens": 182,
+    "completion_tokens": 98,
+    "total_tokens": 280
+  }
+}
+
+
+3.4 GET /api/v1/consultant/tokens/summary/
+------------------------------------------
+View: TokenAnalyticsSummaryView
+Permissions: AllowAny (or Admin)
+Description: Telemetry summary returning aggregate prompt/completion tokens, total AI queries executed, and calculated operational cost estimates in USD ($0.075 / 1M prompt, $0.30 / 1M completion) and INR.
+
+Response (200 OK):
+{
+  "total_queries": 1420,
+  "total_tokens": 784500,
+  "prompt_tokens": 512000,
+  "completion_tokens": 272500,
+  "estimated_cost": {
+    "usd": 0.1202,
+    "inr": 10.39
+  }
+}
+
+
+3.5 GET /api/v1/consultant/sessions/
+------------------------------------
+View: ConsultantSessionViewSet
+Permissions: AllowAny
+Description: Lists live chat consultant sessions with nested message transcripts, status, and linked CRM inquiries.
+
+Response (200 OK):
+[
+  {
+    "id": "7b8f9e20-3341-48e2-b118-40a7cd9e6a01",
+    "session_key": "c9b2e814-5f12-42b7-a3f1-d0b81e892c55",
+    "user": null,
+    "user_email": "candidate@example.com",
+    "user_phone": "+919876543210",
+    "user_name": "Rohit Verma",
+    "initial_topic": "jobs",
+    "current_topic": "jobs",
+    "status": "active",
+    "total_messages": 4,
+    "total_tokens_used": 1120,
+    "inquiry": null,
+    "last_activity": "2026-09-11T14:32:15.000Z",
+    "created_at": "2026-09-11T14:28:00.000Z",
+    "messages": [
+      {
+        "id": "e4f1a238-7182-4f33-8719-710283c74901",
+        "role": "user",
+        "content": "What are the requirements for German Opportunity Card?",
+        "suggested_actions": [],
+        "timestamp": "2026-09-11T14:30:00.000Z",
+        "total_tokens": 0
+      }
+    ]
+  }
+]
+
+
+3.6 GET /api/v1/consultant/sessions/{session_key}/
+--------------------------------------------------
+View: ConsultantSessionViewSet (Retrieve)
+Lookup Field: session_key (UUID or client token string)
+Permissions: AllowAny
+Description: Retrieves session metadata, user contact details, and token usage for a specific session.
+
+
+3.7 GET /api/v1/consultant/sessions/{session_key}/history/
+----------------------------------------------------------
+View: ConsultantSessionViewSet (action: history)
+Permissions: AllowAny
+Description: Returns the full chronological conversation message transcript for the session.
+
+Response (200 OK):
+{
+  "session_id": "c9b2e814-5f12-42b7-a3f1-d0b81e892c55",
+  "topic": "jobs",
+  "status": "active",
+  "messages": [
+    {
+      "id": "e4f1a238-7182-4f33-8719-710283c74901",
+      "role": "user",
+      "content": "What are the requirements for German Opportunity Card?",
+      "suggested_actions": [],
+      "timestamp": "2026-09-11T14:30:00.000Z",
+      "total_tokens": 0
+    },
+    {
+      "id": "a1b2c3d4-0011-2233-4455-66778899aabb",
+      "role": "assistant",
+      "content": "The German Opportunity Card requires a minimum of 6 points...",
+      "suggested_actions": ["Chancenkarte Evaluation", "AI Resume Match"],
+      "timestamp": "2026-09-11T14:30:02.000Z",
+      "total_tokens": 280
+    }
+  ]
+}
+
+
+3.8 POST /api/v1/consultant/sessions/{session_key}/convert-to-inquiry/
+----------------------------------------------------------------------
+View: ConsultantSessionViewSet (action: convert_to_inquiry)
+Permissions: AllowAny
+Description: Seamlessly transitions a warm live AI chat visitor into a permanent CRM Intake Lead record (`Inquiry`). Automatically maps conversation topic to appropriate department category, links foreign key, and sets session status to `converted_to_lead`.
+
+Request Body:
+{
+  "name": "Rohit Verma",               // String, optional (Falls back to session user_name)
+  "email": "rohit.verma@example.com",  // String, optional (Either email or phone required)
+  "phone": "+919876543210"             // String, optional
+}
+
+Response (200 OK):
+{
+  "success": true,
+  "inquiry_id": "3d5f9920-58aa-46d2-965a-8bfe304189aa",
+  "message": "Session converted to CRM lead successfully."
+}
+
+Response (400 Bad Request):
+{
+  "error": "Email or phone required to create inquiry."
+}
+
+
+3.9 URL Aliases
+---------------
+All consultant routes are also aliased to:
+  `/api/v1/ila-consultant/chat/`
+  `/api/v1/ila-consultant/legacy-chat/`
+  `/api/v1/ila-consultant/tokens/summary/`
+  `/api/v1/ila-consultant/sessions/`
+
+
+================================================================================
+4. OMNICHANNEL INTAKE DESK & CRM PIPELINE (FRONT OFFICE)
+================================================================================
+
+4.1 INQUIRIES & APPLICATIONS: /api/v1/inquiries/
+------------------------------------------------
+View: InquiryViewSet
+Permissions:
+  - `create`: AllowAny (Public applicants can register inquiries without authenticating)
+  - All other actions: IsAuthenticated
+Model: Inquiry
+Serializer: InquirySerializer
+Filter Fields: `category`, `payment_status`, `crm_status`, `target_country`, `target_keyword`, `department`
+Search Fields: `name`, `email`, `phone`, `course`, `target_keyword`, `token_number`
+Ordering Fields: `created_at`, `updated_at`, `name`, `ai_score`, `category`, `crm_status`
+Default Ordering: `-created_at`
+
+Category Choices:
+- 'Education': Education & All Courses
+- 'Study Abroad': Study Abroad Hub
+- 'Visa': Visa and Services Hub
+- 'Jobs': Job and Career Hub
+- 'Work While You Study': Work While You Study Track
+- 'Rewards': Rewards Program & Consultant
+- 'General Front Office': General Front Office Reception
+
+Pipeline Stage / CRM Status Choices:
+- `crm_status`: 'New Lead', 'In Discussion', 'Counseling Scheduled', 'Docs Pending', 'Converted', 'Closed / Lost'
+- `payment_status`: 'Pending', 'Partial', 'Paid', 'Refunded'
+- `type`: 'Online', 'Walk-in', 'Referral', 'Phone'
+
+Available Endpoints:
+- GET    /api/v1/inquiries/             (List inquiries with filtering, search, pagination)
+- POST   /api/v1/inquiries/             (Submit new inquiry application - Public)
+- GET    /api/v1/inquiries/{id}/        (Retrieve single inquiry by UUID)
+- PUT    /api/v1/inquiries/{id}/        (Complete record update)
+- PATCH  /api/v1/inquiries/{id}/        (Partial update, e.g. update crm_status, assigned staff)
+- DELETE /api/v1/inquiries/{id}/        (Delete record)
+
+Sample POST Request (Public Lead Intake):
+POST /api/v1/inquiries/
+Content-Type: application/json
+
+{
+  "name": "Ananya Sen",
+  "email": "ananya.sen@example.com",
+  "phone": "+919811223344",
+  "type": "Online",
+  "category": "Study Abroad",
+  "department": "Study Abroad",
+  "target_country": "Germany",
+  "course": "M.Sc. Data Science & AI",
+  "path": "TU Munich Direct Intake Pathway",
+  "batch": "Winter 2026 Batch",
+  "slot": "Evening Live Batch",
+  "target_keyword": "German University Admission",
+  "keywords": ["APS Certificate", "TU Munich", "Data Science", "Blocked Account"],
+  "source_page": "StudyAbroadPage",
+  "source_url": "https://ilaglobal.edu/study-abroad?ref=meta_ads",
+  "section_data": {
+    "highest_qualification": "B.Tech Computer Science (CGPA 8.8)",
+    "ielts_score": "7.5",
+    "german_level": "A2 Goethe",
+    "preferred_intake": "Winter 2026",
+    "has_passport": true
+  },
+  "price": "€1,250",
+  "payment_status": "Pending",
+  "crm_status": "New Lead"
+}
+
+Sample Inquiry Response:
+{
+  "id": "e93f9c62-87ba-4b21-a2bc-33b817cd8421",
+  "token_number": "INQ-94F8A1B0",
+  "name": "Ananya Sen",
+  "email": "ananya.sen@example.com",
+  "phone": "+919811223344",
+  "type": "Online",
+  "category": "Study Abroad",
+  "department": "Study Abroad",
+  "target_keyword": "German University Admission",
+  "keywords": ["APS Certificate", "TU Munich", "Data Science", "Blocked Account"],
+  "source_page": "StudyAbroadPage",
+  "source_url": "https://ilaglobal.edu/study-abroad?ref=meta_ads",
+  "section_data": {
+    "highest_qualification": "B.Tech Computer Science (CGPA 8.8)",
+    "ielts_score": "7.5",
+    "german_level": "A2 Goethe",
+    "preferred_intake": "Winter 2026",
+    "has_passport": true
+  },
+  "course": "M.Sc. Data Science & AI",
+  "path": "TU Munich Direct Intake Pathway",
+  "batch": "Winter 2026 Batch",
+  "slot": "Evening Live Batch",
+  "target_country": "Germany",
+  "visa_type": null,
+  "job_role": null,
+  "resume_url": null,
+  "reward_tier": null,
+  "referral_code": null,
+  "payment_status": "Pending",
+  "crm_status": "New Lead",
+  "pipeline_stage": "Intake",
+  "price": "€1,250",
+  "ai_score": 88,
+  "ai_path": "Recommended for High-Probability German Public University Admission",
+  "assigned_staff_id": null,
+  "assigned_staff_name": null,
+  "follow_up_date": null,
+  "follow_up_status": null,
+  "visa_processing_stage": null,
+  "created_at": "2026-09-11T14:40:00.000Z",
+  "updated_at": "2026-09-11T14:40:00.000Z",
+  "follow_ups": []
+}
+
+
+4.2 FOLLOW-UP LOGS: /api/v1/follow-ups/
+---------------------------------------
+View: FollowUpRecordViewSet
+Permissions: IsAuthenticated
+Model: FollowUpRecord
+Serializer: FollowUpRecordSerializer
+Filter Fields: `inquiry`, `channel`, `outcome`
+Search Fields: `staff_name`, `notes`
+Ordering: `-created_at`
+
+Channel Choices:
+- 'Phone Call', 'WhatsApp', 'In-Person', 'Email'
+
+Endpoints:
+- GET    /api/v1/follow-ups/             (List follow-ups, e.g. ?inquiry=<UUID>)
+- POST   /api/v1/follow-ups/             (Add follow-up note to an inquiry)
+- GET    /api/v1/follow-ups/{id}/        (Retrieve follow-up log)
+- PUT    /api/v1/follow-ups/{id}/        (Update follow-up log)
+- PATCH  /api/v1/follow-ups/{id}/        (Partial update)
+- DELETE /api/v1/follow-ups/{id}/        (Remove follow-up log)
+
+Sample POST Request:
+{
+  "inquiry": "e93f9c62-87ba-4b21-a2bc-33b817cd8421",
+  "date": "2026-09-12",
+  "staff_name": "Meera Kapoor",
+  "channel": "WhatsApp",
+  "notes": "Spoke regarding APS application timeline. Candidate is submitting transcripts this Friday.",
+  "outcome": "Interested - Awaiting Documents"
+}
+
+
+================================================================================
+5. FRANCHISE PARTNER & REGIONAL AGENT NETWORK
+================================================================================
+
+5.1 FRANCHISES: /api/v1/franchises/
+-----------------------------------
+View: FranchiseViewSet
+Permissions: IsAuthenticated
+Model: FranchisePartner
+Serializer: FranchisePartnerSerializer
+Filter Fields: `region`, `is_active`
+Search Fields: `name`, `email`, `franchise_token`, `region`
+Ordering: `-created_at`
+
+Endpoints:
+- GET    /api/v1/franchises/             (List franchises)
+- POST   /api/v1/franchises/             (Register new franchise partner)
+- GET    /api/v1/franchises/{id}/        (Retrieve franchise details)
+- PUT    /api/v1/franchises/{id}/        (Full update)
+- PATCH  /api/v1/franchises/{id}/        (Partial update, e.g. deactivate branch)
+- DELETE /api/v1/franchises/{id}/        (Delete franchise)
+
+Sample POST Request:
+{
+  "name": "ILA South India Regional Center (Bangalore)",
+  "email": "bangalore.hub@ilaglobal.edu",
+  "region": "South India",
+  "franchise_token": "FRAN-BLR-2026-X1",
+  "is_active": true
+}
+
+Sample Response Object:
+{
+  "id": 1,
+  "name": "ILA South India Regional Center (Bangalore)",
+  "email": "bangalore.hub@ilaglobal.edu",
+  "region": "South India",
+  "franchise_token": "FRAN-BLR-2026-X1",
+  "is_active": true,
+  "created_by": 1,
+  "created_by_name": "ILA Executive Super Admin",
+  "created_at": "2026-09-11T12:00:00.000Z"
+}
+
+
+================================================================================
+6. GLOBAL PARTNER INSTITUTIONS & AI TIE-UP ENGINE
+================================================================================
+
+6.1 PARTNERS: /api/v1/partners/
+-------------------------------
+View: PartnerInstitutionViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: PartnerInstitution
+Serializer: PartnerInstitutionSerializer
+Filter Fields: `category`, `country`, `status`
+Search Fields: `name`, `city`, `contact_person`, `email`, `target_criteria`
+Ordering: `-last_updated`
+
+Category Choices:
+- 'University': Public / Private University
+- 'Corporate Employer': Corporate Employer / Placement
+- 'Hospital / Healthcare': Hospital / Healthcare
+- 'Vocational School (Ausbildung)': Vocational School (Ausbildung)
+
+Status Pipeline Choices:
+- 'Target Identified': 1. Target Identified
+- 'Outreach Drafted': 2. Outreach Drafted
+- 'Proposal Dispatched': 3. Proposal Dispatched
+- 'In Discussion': 4. In Discussion
+- 'MOU Signed': 5. MOU Signed
+- 'Active Tie-up Partner': 6. Active Tie-up Partner
+
+Endpoints:
+- GET    /api/v1/partners/             (List partner institutions)
+- POST   /api/v1/partners/             (Create new partner entry)
+- GET    /api/v1/partners/{id}/        (Retrieve partner details)
+- PUT    /api/v1/partners/{id}/        (Update partner details)
+- PATCH  /api/v1/partners/{id}/        (Partial update, e.g. update status to MOU Signed)
+- DELETE /api/v1/partners/{id}/        (Delete partner)
+
+Sample POST Request:
+{
+  "name": "Klinikum Stuttgart Healthcare Group",
+  "category": "Hospital / Healthcare",
+  "country": "Germany",
+  "city": "Stuttgart",
+  "contact_person": "Dr. Hans Becker",
+  "email": "recruiting@klinikum-stuttgart.de",
+  "target_criteria": "B2 German Certified B.Sc. Nurses from Kerala & Tamil Nadu",
+  "commission_ratio": "€2,500 per successfully placed Registered Nurse after Anerkennung",
+  "status": "In Discussion",
+  "synced_departments": ["Study Abroad", "HR", "Finance"]
+}
+
+
+6.2 OUTREACH LOGS: /api/v1/outreach-logs/
+-----------------------------------------
+View: TieUpOutreachLogViewSet
+Permissions: IsAuthenticated
+Model: TieUpOutreachLog
+Serializer: TieUpOutreachLogSerializer
+Filter Fields: `partner`, `is_dispatched`
+Search Fields: `subject`, `generated_proposal_text`, `response_notes`
+Ordering: `-dispatched_at`
+
+Endpoints:
+- GET    /api/v1/outreach-logs/             (List outreach logs)
+- POST   /api/v1/outreach-logs/             (Record an AI-generated proposal dispatch)
+- GET    /api/v1/outreach-logs/{id}/        (Retrieve log)
+- PUT    /api/v1/outreach-logs/{id}/        (Update log)
+- PATCH  /api/v1/outreach-logs/{id}/        (Partial update, e.g. log partner response)
+- DELETE /api/v1/outreach-logs/{id}/        (Delete log)
+
+Sample POST Request:
+{
+  "partner": 3,
+  "subject": "Strategic Partnership Proposal: Dual-Degree Corridor 2026-2027",
+  "generated_proposal_text": "Dear International Office, ILA Academy proposes an institutional partnership to screen and deliver pre-qualified Indian students...",
+  "is_dispatched": true,
+  "dispatched_at": "2026-09-11T13:00:00.000Z",
+  "response_notes": "Awaiting initial feedback from Dean of International Affairs."
+}
+
+
+================================================================================
+7. MARKETING STUDIO, FIELD OPERATIONS & STRATEGIC MEETINGS
+================================================================================
+
+7.1 MARKETING CAMPAIGNS: /api/v1/campaigns/
+-------------------------------------------
+View: MarketingCampaignViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: MarketingCampaign
+Serializer: MarketingCampaignSerializer (Computes dynamic field `roi` based on `spent` and `conversions_count`)
+Filter Fields: `channel`, `status`, `target_geography`
+Search Fields: `name`, `channel`
+Ordering: `-created_at`
+
+Channel Choices:
+- 'Meta Ads', 'Google PPC', 'WhatsApp', 'Field Visits', 'SEO Organic'
+
+Status Choices:
+- 'Active', 'Completed', 'Paused'
+
+Endpoints:
+- GET    /api/v1/campaigns/             (List campaigns with calculated ROI)
+- POST   /api/v1/campaigns/             (Create new campaign)
+- GET    /api/v1/campaigns/{id}/        (Retrieve campaign)
+- PUT    /api/v1/campaigns/{id}/        (Update campaign budget/conversions)
+- PATCH  /api/v1/campaigns/{id}/        (Partial update)
+- DELETE /api/v1/campaigns/{id}/        (Delete campaign)
+
+Sample Campaign Object:
+{
+  "id": 1,
+  "name": "German Chancenkarte Masterclass Meta Ads",
+  "channel": "Meta Ads",
+  "budget": "45000.00",
+  "spent": "32400.00",
+  "target_geography": "Delhi NCR, Bangalore, Pune, Hyderabad",
+  "status": "Active",
+  "leads_count": 480,
+  "conversions_count": 62,
+  "roi": 0.38,
+  "created_at": "2026-09-01T09:00:00.000Z"
+}
+
+
+7.2 FIELD VISIT LOGS: /api/v1/field-visits/
+-------------------------------------------
+View: FieldVisitLogViewSet
+Permissions: IsAuthenticated
+Model: FieldVisitLog
+Serializer: FieldVisitLogSerializer
+Search Fields: `institution_visited`, `contact_person`, `location`, `summary`
+Ordering: `-visit_date`
+
+Endpoints:
+- GET    /api/v1/field-visits/          (List institutional campus visit logs)
+- POST   /api/v1/field-visits/          (Log a new visit)
+- GET    /api/v1/field-visits/{id}/     (Retrieve visit report)
+- PUT    /api/v1/field-visits/{id}/     (Full update)
+- PATCH  /api/v1/field-visits/{id}/     (Partial update)
+- DELETE /api/v1/field-visits/{id}/     (Delete visit log)
+
+Sample POST Request:
+{
+  "institution_visited": "PSG College of Technology",
+  "location": "Coimbatore, Tamil Nadu",
+  "contact_person": "Dr. R. Murugesan (Dean Placement)",
+  "summary": "Presented German engineering opportunities and Chancenkarte seminar. 180 final year students attended.",
+  "next_action": "Follow up with MOU draft for on-campus A1 German training batch.",
+  "visit_date": "2026-09-10"
+}
+
+
+7.3 DEPARTMENT MEETINGS: /api/v1/department-meetings/
+-----------------------------------------------------
+View: DepartmentMeetingViewSet
+Permissions: IsAuthenticated
+Model: DepartmentMeeting
+Serializer: DepartmentMeetingSerializer
+Filter Fields: `department`, `status`
+Search Fields: `title`, `agenda`, `attendees`
+Ordering: `-date`
+
+Status Choices:
+- 'Scheduled', 'Completed'
+
+Endpoints:
+- GET    /api/v1/department-meetings/          (List scheduled and completed meetings)
+- POST   /api/v1/department-meetings/          (Schedule new meeting)
+- GET    /api/v1/department-meetings/{id}/     (Retrieve meeting agenda)
+- PUT    /api/v1/department-meetings/{id}/     (Update minutes and status)
+- PATCH  /api/v1/department-meetings/{id}/     (Partial update)
+- DELETE /api/v1/department-meetings/{id}/     (Cancel meeting)
+
+
+================================================================================
+8. REWARDS PROGRAM & JUNIOR CONSULTANT NETWORK
+================================================================================
+
+8.1 Dual-Account Architecture & Gamified Milestone Engine
+---------------------------------------------------------
+Every student or applicant registering on the portal can simultaneously function as a Junior Educational Consultant.
+- Auto-provisioned Consultant ID: `ILA-JC-XXXX`
+- Tier Progression:
+    1. 'Junior Consultant' (0 - 499 active points)
+    2. 'Senior Executive Consultant' (500 - 1,999 active points)
+    3. 'Global Venture Partner' (2,000+ active points)
+- Automatic Work Certificate: Automatically unlocked when reaching 1,000 monthly points (`work_certificate_issued = True`).
+- Points Allocation Rule:
+    - Inquiry Generated: +10 points
+    - Successful Enrollment: +50 points
+    - Monthly Payout Unlock: 1000 points (€100 cash equivalent)
+
+8.2 REWARD PROFILES: /api/v1/rewards/
+-------------------------------------
+View: RewardProfileViewSet
+Permissions: IsAuthenticated
+Model: RewardProfile
+Serializer: RewardProfileSerializer
+Filter Fields: `tier`, `work_certificate_issued`
+Search Fields: `consultant_id`, `user__username`, `user__email`, `user__first_name`, `user__last_name`
+Ordering: `-lifetime_points`
+
+Endpoints:
+- GET    /api/v1/rewards/             (List consultant reward profiles)
+- POST   /api/v1/rewards/             (Create profile manually if not auto-provisioned)
+- GET    /api/v1/rewards/{id}/        (Retrieve consultant profile and history)
+- PUT    /api/v1/rewards/{id}/        (Full update)
+- PATCH  /api/v1/rewards/{id}/        (Partial update, e.g. update promoted categories)
+- DELETE /api/v1/rewards/{id}/        (Delete profile)
+
+Sample Response Object:
+{
+  "id": 4,
+  "consultant_id": "ILA-JC-0014",
+  "user": 14,
+  "user_name": "Arjun Sharma",
+  "user_email": "arjun.sharma@example.com",
+  "tier": "Junior Consultant",
+  "active_points": 160,
+  "lifetime_points": 160,
+  "monthly_points": 60,
+  "cash_earned": "0.00",
+  "promoted_categories": ["Study Abroad", "Jobs"],
+  "work_certificate_issued": false,
+  "created_at": "2026-09-11T14:00:00.000Z",
+  "transactions": [
+    {
+      "id": 1,
+      "profile": 4,
+      "points": 100,
+      "description": "Dual-account welcome bonus",
+      "milestone_type": "Inquiry Generated (10 pts)",
+      "reference_inquiry_id": null,
+      "timestamp": "2026-09-11T14:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "profile": 4,
+      "points": 50,
+      "description": "Referral student enrolled in A1 German Batch",
+      "milestone_type": "Successful Enrollment (50 pts)",
+      "reference_inquiry_id": "INQ-78A123",
+      "timestamp": "2026-09-11T14:15:00.000Z"
+    }
+  ]
+}
+
+
+8.3 REWARD TRANSACTIONS: /api/v1/reward-transactions/
+-----------------------------------------------------
+View: RewardTransactionViewSet
+Permissions: IsAuthenticated
+Model: RewardTransaction
+Serializer: RewardTransactionSerializer
+Filter Fields: `profile`, `milestone_type`
+Search Fields: `description`, `reference_inquiry_id`
+Ordering: `-timestamp`
+
+Milestone Choices:
+- 'Inquiry Generated (10 pts)'
+- 'Successful Enrollment (50 pts)'
+- 'Monthly Payout Unlock (1000 pts)'
+
+Sample POST Request:
+{
+  "profile": 4,
+  "points": 10,
+  "description": "Lead generated via personal referral link",
+  "milestone_type": "Inquiry Generated (10 pts)",
+  "reference_inquiry_id": "INQ-BLR-0091"
+}
+
+
+================================================================================
+9. WORK WHILE STUDY & AI PRELIMINARY INTERVIEWS
+================================================================================
+
+9.1 WORK & STUDY APPLICATIONS: /api/v1/work-study-applications/
+---------------------------------------------------------------
+View: WorkStudyApplicationViewSet
+Permissions: AllowAny (Public applicant submission enabled)
+Model: WorkStudyApplication
+Serializer: WorkStudyApplicationSerializer
+Filter Fields: `track`, `ai_interview_status`, `is_onboarded_to_dept`
+Search Fields: `candidate_name`, `email`, `phone`, `sub_domain`
+Ordering: `-created_at`
+
+Track Choices:
+- 'Work While You Learn in India'
+- 'Part time While You Study Abroad'
+- 'German Project Onboarding Pathway'
+- 'Junior Consultant Track'
+
+AI Interview Status Choices:
+- 'Pending AI Link'
+- 'Completed'
+- 'Scheduled for HR Round 2'
+
+Endpoints:
+- GET    /api/v1/work-study-applications/          (List applications)
+- POST   /api/v1/work-study-applications/          (Submit public application, multipart supported)
+- GET    /api/v1/work-study-applications/{id}/     (Retrieve application & interview scores)
+- PUT    /api/v1/work-study-applications/{id}/     (Update record)
+- PATCH  /api/v1/work-study-applications/{id}/     (Partial update, e.g. update interview score/status)
+- DELETE /api/v1/work-study-applications/{id}/     (Delete application)
+
+Sample POST Request:
+{
+  "candidate_name": "Deepak Nair",
+  "email": "deepak.nair@example.com",
+  "phone": "+919745123456",
+  "track": "German Project Onboarding Pathway",
+  "sub_domain": "Junior Full-Stack Web Development",
+  "ai_preliminary_interview_link": "https://interview.ilaglobal.edu/session/ai-9912",
+  "ai_interview_score": 82,
+  "ai_interview_status": "Completed",
+  "ai_interview_transcript": "Candidate demonstrated strong comprehension of React, TypeScript, and B1 German communication basics.",
+  "is_onboarded_to_dept": false
+}
+
+
+================================================================================
+10. DYNAMIC VISA REQUIREMENTS & IMMIGRATION CONCIERGE
+================================================================================
+
+10.1 VISA REQUIREMENT RULES: /api/v1/visa-rules/
+------------------------------------------------
+View: VisaRequirementRuleViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: VisaRequirementRule
+Serializer: VisaRequirementRuleSerializer
+Filter Fields: `country`, `visa_type`
+Search Fields: `country`, `visa_type`, `primary_authority`
+Ordering: `country`
+
+Endpoints:
+- GET    /api/v1/visa-rules/             (List visa requirements by country)
+- POST   /api/v1/visa-rules/             (Create requirement rule)
+- GET    /api/v1/visa-rules/{id}/        (Retrieve rule)
+- PUT    /api/v1/visa-rules/{id}/        (Update blocked account / checklist details)
+- PATCH  /api/v1/visa-rules/{id}/        (Partial update)
+- DELETE /api/v1/visa-rules/{id}/        (Delete rule)
+
+Sample Rule Object:
+{
+  "id": 1,
+  "country": "Germany",
+  "visa_type": "Opportunity Card (Chancenkarte - §20a AufenthG)",
+  "blocked_funds_amount": "€1,027 / month (€12,324 / year)",
+  "embassy_queue_days": "15-28 Days",
+  "primary_authority": "German Federal Foreign Office / VFS Global",
+  "mandatory_checklists": [
+    "Valid Passport (> 12 months validity)",
+    "ZAB or Anabin Degree Equivalence Statement (APS not mandatory for job seekers)",
+    "Proof of German A2 or English C1 Language Certificate",
+    "Point calculation proof (Min 6 points achieved)",
+    "Blocked Account or Formal Obligation (Verpflichtungserklärung)",
+    "Incoming Health Insurance (Incoming-Krankenversicherung)"
+  ],
+  "last_monitored_update": "2026-09-11T12:00:00.000Z"
+}
+
+
+10.2 SETTLEMENT CONCIERGE: /api/v1/settlement-requests/
+-------------------------------------------------------
+View: SettlementServiceViewSet
+Permissions: AllowAny (Public intake permitted)
+Model: SettlementServiceRequest
+Serializer: SettlementServiceRequestSerializer
+Filter Fields: `target_country`, `status`
+Search Fields: `candidate_name`, `email`
+Ordering: `-arrival_date`
+
+Service Choices (JSON Array):
+- 'Airport Pickup & Reception'
+- 'Accommodation & Room Arrangement (WG)'
+- 'Documentation & Bank Account (Anmeldung/Expatrio)'
+- 'Part-time Job Placement Assistance'
+
+Status Choices:
+- 'Pending Coordinator Assignment', 'Coordinator Assigned', 'In Progress', 'Completed'
+
+Endpoints:
+- GET    /api/v1/settlement-requests/          (List arrival concierge requests)
+- POST   /api/v1/settlement-requests/          (Submit settlement request)
+- GET    /api/v1/settlement-requests/{id}/     (Retrieve request details)
+- PUT    /api/v1/settlement-requests/{id}/     (Update request)
+- PATCH  /api/v1/settlement-requests/{id}/     (Assign coordinator / update status)
+- DELETE /api/v1/settlement-requests/{id}/     (Delete request)
+
+Sample POST Request:
+{
+  "candidate_name": "Sneha Roy",
+  "email": "sneha.roy@example.com",
+  "target_country": "Germany",
+  "arrival_date": "2026-10-04",
+  "services_requested": [
+    "Airport Pickup & Reception",
+    "Accommodation & Room Arrangement (WG)",
+    "Documentation & Bank Account (Anmeldung/Expatrio)"
+  ],
+  "status": "Pending Coordinator Assignment"
+}
+
+
+================================================================================
+11. CORE ENTERPRISE OPERATIONS & HRMS
+================================================================================
+
+11.1 ENTERPRISE TASKS: /api/v1/tasks/
+-------------------------------------
+View: EnterpriseTaskViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: EnterpriseTask
+Serializer: EnterpriseTaskSerializer
+Filter Fields: `assigned_to_dept`, `status`, `priority`
+Search Fields: `title`, `description`
+Ordering: `-created_at`
+
+Status Choices:
+- 'Pending', 'In Progress', 'Success', 'Negative'
+
+Priority Choices:
+- 'High', 'Medium', 'Low'
+
+Endpoints:
+- GET    /api/v1/tasks/             (List tasks across departments)
+- POST   /api/v1/tasks/             (Assign new task)
+- GET    /api/v1/tasks/{id}/        (Retrieve task details)
+- PUT    /api/v1/tasks/{id}/        (Update task status)
+- PATCH  /api/v1/tasks/{id}/        (Partial update)
+- DELETE /api/v1/tasks/{id}/        (Delete task)
+
+Sample POST Request:
+{
+  "title": "Verify APS Certificates for Winter 2026 Engineering Batch",
+  "description": "Check Anabin database equivalency and authenticity of university transcripts.",
+  "assigned_to_dept": "Study Abroad",
+  "status": "In Progress",
+  "priority": "High"
+}
+
+
+11.2 ATTENDANCE LOGS: /api/v1/attendance/
+-----------------------------------------
+View: AttendanceViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: AttendanceLog
+Serializer: AttendanceLogSerializer
+Filter Fields: `status`, `date`
+Search Fields: `staff_id`, `staff_name`
+Ordering: `-id`
+
+Status Choices:
+- 'Present', 'Late', 'Half Day', 'On Leave', 'Biometric Verified'
+
+Endpoints:
+- GET    /api/v1/attendance/             (List daily employee attendance logs)
+- POST   /api/v1/attendance/             (Log biometric check-in)
+- GET    /api/v1/attendance/{id}/        (Retrieve single record)
+- PUT    /api/v1/attendance/{id}/        (Update check-in details)
+- PATCH  /api/v1/attendance/{id}/        (Partial update)
+- DELETE /api/v1/attendance/{id}/        (Delete log)
+
+Sample Check-In POST:
+{
+  "staff_id": "STAFF-003",
+  "staff_name": "Meera Kapoor",
+  "check_in_time": "08:55 AM",
+  "status": "Present",
+  "date": "2026-09-11"
+}
+
+
+11.3 ENTERPRISE APPROVALS: /api/v1/approvals/
+---------------------------------------------
+View: ApprovalViewSet
+Permissions: IsAuthenticatedOrReadOnly
+Model: ApprovalRequest
+Serializer: ApprovalRequestSerializer
+Filter Fields: `department`, `status`, `type`
+Search Fields: `requested_by`, `description`
+Ordering: `-id`
+
+Status Choices:
+- 'Pending', 'Approved', 'Rejected'
+
+Endpoints:
+- GET    /api/v1/approvals/             (List pending/processed approvals)
+- POST   /api/v1/approvals/             (Submit expenditure/leave approval request)
+- GET    /api/v1/approvals/{id}/        (Retrieve approval details)
+- PUT    /api/v1/approvals/{id}/        (Update approval status)
+- PATCH  /api/v1/approvals/{id}/        (Approve or reject by HOD / CEO)
+- DELETE /api/v1/approvals/{id}/        (Cancel request)
+
+Sample POST Request:
+{
+  "type": "Budget Allocation for Meta Ad Campaign",
+  "description": "Requesting €600 budget release for Chancenkarte South India marketing campaign.",
+  "requested_by": "Meera Kapoor",
+  "department": "Marketing",
+  "status": "Pending",
+  "date": "2026-09-11"
+}
+
+
+================================================================================
+12. MODULAR SPECIALIZED SUBSYSTEMS REFERENCE
+================================================================================
+In addition to the central endpoints mounted in `Applications.ILA_WEB.urls`, the app contains 6 specialized domain subsystems with dedicated models, views, and routers:
+
+12.1 Academics Subsystem (`Applications/ILA_WEB/Academics/`)
+-----------------------------------------------------------
+Router File: `academics_urls.py`
+Views: `academics_views.py` | Models: `academics_models.py`
+Endpoints & Capabilities:
+- Categories & Subcategories:
+    GET, POST, PUT, DELETE `/categories/` (GlobalCategoryViewSet - course taxonomy, programs)
+- Teaching & Pedagogical Strategies:
+    GET, POST, PUT, DELETE `/strategies/teaching/` (TeachingStrategyViewSet - interactive learning methods)
+- Student Analyzing & Performance Analytics:
+    GET, POST, PUT, DELETE `/strategies/analyzing/` (StudentAnalyzingStrategyViewSet - assessment rubrics)
+- Global Courses:
+    GET, POST, PUT, DELETE `/courses/` (GlobalCourseViewSet - filters by library_type, category, sub_category)
+- Educational Paths & Milestones:
+    GET, POST, PUT, DELETE `/paths/` (GlobalPathViewSet - sequential academic roadmap)
+- Live Batches & Cohorts:
+    GET, POST, PUT, DELETE `/batches/` (GlobalBatchViewSet - schedule, max students, instructor assignment)
+- Timetable & Class Sessions:
+    GET, POST, PUT, DELETE `/timetable/` (ClassScheduleSessionViewSet - recurring calendar timetable)
+- Course Materials & Syllabus:
+    GET, POST, PUT, DELETE `/materials/` (CourseMaterialViewSet - PDF guides, video lectures)
+- Student Enrollments:
+    GET, POST, PUT, DELETE `/enrollments/` (StudentEnrollmentViewSet - course progress, fee status)
+
+
+12.2 Finance Subsystem (`Applications/ILA_WEB/Finance/`)
+-------------------------------------------------------
+Router File: `finance_urls.py`
+Views: `finance_views.py` | Models: `finance_models.py`
+Endpoints & Capabilities:
+- General Financial Ledger:
+    GET, POST, PUT, DELETE `/ledger/` (FinancialLedgerViewSet - debits, credits, account heads, department allocation)
+- Revenue & Sales Tracking:
+    GET, POST, PUT, DELETE `/sales/` (SalesRecordViewSet - student fee invoices, franchise royalties)
+- Capital & Reserve Fund Pools:
+    GET, POST, PUT, DELETE `/funds/` (FundPoolViewSet - allocated budget pools, escrow)
+- Commissions & Referral Disbursements:
+    GET, POST, PUT, DELETE `/commissions/` (CommissionItemViewSet - partner agency & consultant payouts)
+
+
+12.3 Front Office Subsystem (`Applications/ILA_WEB/FrontOffice/`)
+-----------------------------------------------------------------
+Router File: `frontoffice_urls.py`
+Views: `frontoffice_views.py` | Models: `frontoffice_models.py`
+Endpoints & Capabilities:
+- Front Office Intake CRM:
+    GET, POST, PUT, DELETE `/inquiries/` (InquiryViewSet - front desk visitors, phone inquiries)
+- Physical Visitor & Security Logs:
+    POST `/visitor-log/` (VisitorLogCreateView - campus visitor badges, contact logging)
+
+
+12.4 HRMS Subsystem (`Applications/ILA_WEB/HRMS/`)
+-------------------------------------------------
+Router File: `hrms_urls.py`
+Views: `hrms_views.py` | Models: `hrms_models.py`
+Endpoints & Capabilities:
+- Staff Personnel Profiles:
+    GET, POST, PUT, DELETE `/staff/` (StaffProfileViewSet - employee credentials, base salary, contract dates)
+- Biometric Attendance Tracking:
+    GET, POST, PUT, DELETE `/attendance/` (AttendanceLogViewSet - punch-in timestamps, GPS coordinates)
+- Talent Acquisition & Candidate Pool:
+    GET, POST, PUT, DELETE `/candidates/` (HRCandidateViewSet - job applicant resumes, interview rounds)
+- Internal Task Delegation:
+    GET, POST, PUT, DELETE `/tasks/` (EnterpriseTaskViewSet - HR & operational assignment boards)
+- Administrative Approval Engine:
+    GET, POST, PUT, DELETE `/approvals/` (ApprovalRequestViewSet - leave applications, reimbursement signoffs)
+- Payroll-to-Finance Synchronization:
+    POST `/payroll/sync-finance/` (PayrollSyncView - compiles monthly salary ledger items into Finance)
+
+
+12.5 Rewards Subsystem (`Applications/ILA_WEB/Rewards/`)
+-------------------------------------------------------
+Router File: `rewards_urls.py`
+Views: `rewards_views.py` | Models: `rewards_models.py`
+Endpoints & Capabilities:
+- Affiliate & Referral Records:
+    GET, POST, PUT, DELETE `/referrals/` (ReferralRecordViewSet - tracking referral codes and affiliate leads)
+- Tier Qualification Rules:
+    GET, POST, PUT, DELETE `/tiers/` (TierRuleViewSet - points thresholds, commission rates per tier)
+
+
+12.6 AI Engine Subsystem (`Applications/ILA_WEB/AIEngine/`)
+-----------------------------------------------------------
+Router File: `ai_urls.py`
+Views: `ai_views.py` | Services: `gemini_service.py`
+Endpoints & Capabilities:
+- AI Curriculum Generator:
+    POST `/course-creator/generate/` (or `/course-creator/`)
+    Input: `{"course_name": "B2 Medical German", "category": "Healthcare", "duration": "4 Months"}`
+    Output: Structured JSON curriculum syllabus with weekly modules and learning outcomes.
+- AI Candidate Eligibility Checker:
+    POST `/eligibility-check/` (or `/eligibility/`)
+    Input: Full applicant profile object (age, qualifications, language scores, work experience)
+    Output: Calculated Chancenkarte score, German visa probability, recommendations.
+- Interactive Classroom AI Tutor:
+    POST `/classroom/chat/` (or `/classroom-chat/`)
+    Input: `{"question": "How do German separable verbs (trennbare Verben) work in Perfekt?", "course_context": "German A2"}`
+    Output: Personalized tutor explanation with grammatical examples.
+- Automated AI Resume Parser:
+    POST `/candidate/parse-resume/` (or `/parse-resume/`)
+    Input: `{"resume_text": "<Extracted text from CV / PDF>"}`
+    Output: Structured JSON containing skills, work experience years, degree equivalence, and score.
+
+
+================================================================================
+13. COMPLETE TYPESCRIPT DATA INTERFACES (FRONTEND DTOs)
+================================================================================
+The following contracts match the exact JSON schemas returned by DRF serializers:
+
+```typescript
+// Authentication & User Models
+export interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  role: 'Super Admin' | 'CEO' | 'General Manager' | 'HOD' | 'HR Manager' | 'Marketing Exec' | 'Academic Counselor' | 'student';
+  department: string;
+  phone?: string;
+  hr_issued_id?: string | null;
+  status: 'Active' | 'On Leave' | 'Terminated';
+  hr_approval_status: 'Approved' | 'Pending Review';
+  is_biometric_authorized: boolean;
+}
+
+export interface AuthTokens {
+  access: string;
+  refresh: string;
+  user: UserProfile;
+}
+
+// CRM & Intake Desk
+export interface Inquiry {
+  id: string; // UUID
+  token_number: string;
+  name: string;
+  email: string;
+  phone: string;
+  type: 'Walk-in' | 'Online' | 'Referral' | 'Phone';
+  category: 'Education' | 'Study Abroad' | 'Visa' | 'Jobs' | 'Work While You Study' | 'Rewards' | 'General Front Office';
+  department?: string;
+  target_keyword?: string;
+  keywords: string[];
+  source_page?: string;
+  source_url?: string;
+  section_data: Record<string, any>;
+  course?: string;
+  path?: string;
+  batch?: string;
+  slot?: string;
+  target_country?: string;
+  visa_type?: string;
+  job_role?: string;
+  resume_url?: string;
+  reward_tier?: string;
+  referral_code?: string;
+  payment_status: 'Pending' | 'Partial' | 'Paid' | 'Refunded';
+  crm_status: 'New Lead' | 'In Discussion' | 'Counseling Scheduled' | 'Docs Pending' | 'Converted' | 'Closed / Lost';
+  pipeline_stage: string;
+  price: string;
+  ai_score?: number | null;
+  ai_path?: string | null;
+  assigned_staff_id?: string | null;
+  assigned_staff_name?: string | null;
+  follow_up_date?: string | null;
+  follow_up_status?: string | null;
+  visa_processing_stage?: string | null;
+  created_at: string;
+  updated_at: string;
+  follow_ups?: FollowUpRecord[];
+}
+
+export interface FollowUpRecord {
+  id: number;
+  inquiry: string; // UUID
+  date: string;
+  staff_name: string;
+  channel: 'Phone Call' | 'WhatsApp' | 'In-Person' | 'Email';
+  notes: string;
+  outcome: string;
+  created_at: string;
+}
+
+// Live AI Consultant
+export interface ConsultantMessage {
+  id: string; // UUID
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  suggested_actions: string[];
+  timestamp: string;
+  total_tokens: number;
+}
+
+export interface ConsultantSession {
+  id: string; // UUID
+  session_key: string;
+  user?: number | null;
+  user_email?: string;
+  user_phone?: string;
+  user_name?: string;
+  initial_topic: string;
+  current_topic: string;
+  status: 'active' | 'resolved' | 'converted_to_lead' | 'abandoned';
+  total_messages: number;
+  total_tokens_used: number;
+  inquiry?: string | null;
+  last_activity: string;
+  created_at: string;
+  messages: ConsultantMessage[];
+}
+
+export interface TokenAnalyticsSummary {
+  total_queries: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  estimated_cost: {
+    usd: number;
+    inr: number;
+  };
+}
+
+// Partner Institutions
+export interface PartnerInstitution {
+  id: number;
+  name: string;
+  category: 'University' | 'Corporate Employer' | 'Hospital / Healthcare' | 'Vocational School (Ausbildung)';
+  country: string;
+  city: string;
+  contact_person: string;
+  email: string;
+  target_criteria: string;
+  commission_ratio: string;
+  status: 'Target Identified' | 'Outreach Drafted' | 'Proposal Dispatched' | 'In Discussion' | 'MOU Signed' | 'Active Tie-up Partner';
+  synced_departments: string[];
+  last_updated: string;
+  outreach_logs_count?: number;
+}
+
+export interface TieUpOutreachLog {
+  id: number;
+  partner: number;
+  partner_name?: string;
+  subject: string;
+  generated_proposal_text: string;
+  dispatched_by?: number | null;
+  dispatched_by_name?: string | null;
+  is_dispatched: boolean;
+  dispatched_at?: string | null;
+  response_notes: string;
+}
+
+// Marketing Studio
+export interface MarketingCampaign {
+  id: number;
+  name: string;
+  channel: 'Meta Ads' | 'Google PPC' | 'WhatsApp' | 'Field Visits' | 'SEO Organic';
+  budget: string;
+  spent: string;
+  target_geography: string;
+  status: 'Active' | 'Completed' | 'Paused';
+  leads_count: number;
+  conversions_count: number;
+  roi: number;
+  created_at: string;
+}
+
+export interface FieldVisitLog {
+  id: number;
+  institution_visited: string;
+  location: string;
+  contact_person: string;
+  summary: string;
+  next_action: string;
+  visit_date: string;
+  logged_by?: number | null;
+  logged_by_name?: string;
+}
+
+export interface DepartmentMeeting {
+  id: number;
+  department: string;
+  title: string;
+  agenda: string;
+  attendees: string;
+  date: string;
+  time: string;
+  status: 'Scheduled' | 'Completed';
+}
+
+// Rewards Program
+export interface RewardProfile {
+  id: number;
+  consultant_id: string;
+  user: number;
+  user_name: string;
+  user_email: string;
+  tier: 'Junior Consultant' | 'Senior Executive Consultant' | 'Global Venture Partner';
+  active_points: number;
+  lifetime_points: number;
+  monthly_points: number;
+  cash_earned: string;
+  promoted_categories: string[];
+  work_certificate_issued: boolean;
+  created_at: string;
+  transactions?: RewardTransaction[];
+}
+
+export interface RewardTransaction {
+  id: number;
+  profile: number;
+  points: number;
+  description: string;
+  milestone_type: 'Inquiry Generated (10 pts)' | 'Successful Enrollment (50 pts)' | 'Monthly Payout Unlock (1000 pts)';
+  reference_inquiry_id?: string | null;
+  timestamp: string;
+}
+
+// Work Study & Visa Requirements
+export interface WorkStudyApplication {
+  id: number;
+  candidate_name: string;
+  email: string;
+  phone: string;
+  track: 'Work While You Learn in India' | 'Part time While You Study Abroad' | 'German Project Onboarding Pathway' | 'Junior Consultant Track';
+  sub_domain: string;
+  resume_file?: string | null;
+  ai_preliminary_interview_link?: string | null;
+  ai_interview_score: number;
+  ai_interview_status: 'Pending AI Link' | 'Completed' | 'Scheduled for HR Round 2';
+  ai_interview_transcript: string;
+  is_onboarded_to_dept: boolean;
+  created_at: string;
+}
+
+export interface VisaRequirementRule {
+  id: number;
+  country: string;
+  visa_type: string;
+  blocked_funds_amount: string;
+  embassy_queue_days: string;
+  primary_authority: string;
+  mandatory_checklists: string[];
+  last_monitored_update: string;
+}
+
+export interface SettlementServiceRequest {
+  id: number;
+  candidate_name: string;
+  email: string;
+  target_country: string;
+  arrival_date?: string | null;
+  services_requested: string[];
+  status: string;
+  assigned_coordinator?: number | null;
+  coordinator_name?: string | null;
+}
+
+// Core Operations
+export interface EnterpriseTask {
+  id: number;
+  title: string;
+  description: string;
+  assigned_to_dept: string;
+  status: 'Pending' | 'In Progress' | 'Success' | 'Negative';
+  priority: 'High' | 'Medium' | 'Low';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttendanceLog {
+  id: number;
+  staff_id: string;
+  staff_name: string;
+  check_in_time: string;
+  status: string;
+  date: string;
+}
+
+export interface ApprovalRequest {
+  id: number;
+  type: string;
+  description: string;
+  requested_by: string;
+  department: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  date: string;
+}
+```
+
+
+================================================================================
+14. INTEGRATION SNIPPETS & CLIENT HOOKS
+================================================================================
+
+14.1 Production Axios Client (`src/services/apiClient.ts`)
+----------------------------------------------------------
+```typescript
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+
+export const apiClient = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Attach JWT access token and biometric pin if available
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ila_access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  const biometricToken = localStorage.getItem('ila_biometric_token');
+  if (biometricToken) {
+    config.headers['X-Biometric-Token'] = biometricToken;
+  }
+  return config;
+});
+
+// Automatic token refresh interceptor
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refresh = localStorage.getItem('ila_refresh_token');
+      if (refresh) {
+        try {
+          const res = await axios.post(`${API_BASE}/auth/token/refresh/`, { refresh });
+          const newAccess = res.data.access;
+          localStorage.setItem('ila_access_token', newAccess);
+          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+          return apiClient(originalRequest);
+        } catch (refreshErr) {
+          localStorage.removeItem('ila_access_token');
+          localStorage.removeItem('ila_refresh_token');
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+```
+
+14.2 Custom React Hook for CRM Leads (`useInquiries.ts`)
+--------------------------------------------------------
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../services/apiClient';
+import { Inquiry } from '../types';
+
+export function useInquiries(categoryFilter?: string) {
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchInquiries = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = categoryFilter ? { category: categoryFilter } : undefined;
+      const res = await apiClient.get<Inquiry[]>('/inquiries/', { params });
+      setInquiries(res.data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to fetch inquiries.');
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryFilter]);
+
+  useEffect(() => {
+    fetchInquiries();
+  }, [fetchInquiries]);
+
+  const submitInquiry = async (data: Partial<Inquiry>) => {
+    const res = await apiClient.post<Inquiry>('/inquiries/', data);
+    setInquiries((prev) => [res.data, ...prev]);
+    return res.data;
+  };
+
+  return { inquiries, loading, error, refresh: fetchInquiries, submitInquiry };
+}
+```
+
+14.3 cURL Execution Samples
+---------------------------
+# 1. Authenticate & Obtain JWT
+curl -X POST http://127.0.0.1:8000/api/v1/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "Admin@123"}'
+
+# 2. Public Inquiry Submission
+curl -X POST http://127.0.0.1:8000/api/v1/inquiries/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Kiran Kumar",
+    "email": "kiran@example.com",
+    "phone": "+919845012345",
+    "category": "Visa",
+    "target_keyword": "Chancenkarte Fast-Track",
+    "price": "€499"
+  }'
+
+# 3. Live AI Consultant Query
+curl -X POST http://127.0.0.1:8000/api/v1/consultant/legacy-chat/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What is the minimum German level required for Ausbildung?",
+    "topic": "education"
+  }'
+
+# 4. Fetch Visa Rules with Bearer Token
+curl -X GET http://127.0.0.1:8000/api/v1/visa-rules/ \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+
+================================================================================
+15. ERROR CODES & PRODUCTION TROUBLESHOOTING RUNBOOK
+================================================================================
+
+1. HTTP 401: Token Not Valid / Signature Expired
+   - Cause: JWT access token expired after 60 minutes or secret key modified.
+   - Solution: Ensure the frontend interceptor dispatches POST `/api/v1/auth/token/refresh/` using stored `ila_refresh_token`.
+
+2. HTTP 403: Forbidden / Permission Denied
+   - Cause: User role does not possess permissions for this endpoint (e.g. Student role accessing `/staff/` or `/approvals/`).
+   - Solution: Log in as Super Admin, CEO, or relevant HOD role. If Level 1 biometric check is active, include `X-Biometric-Token: 7890`.
+
+3. HTTP 429: Throttled on AI Chat
+   - Cause: More than 20 queries dispatched in 60 seconds from the same client IP address.
+   - Solution: Throttling window resets after 60 seconds. On frontend, implement debouncing and disable chat send button while awaiting response.
+
+4. HTTP 500: Gemini API Configuration Issue
+   - Cause: Environment variable `GEMINI_API_KEY` missing or expired in `.env`.
+   - Solution: The backend automatically falls back to domain-grounded knowledge templates so the user experience is never interrupted. To activate full LLM streaming, add a valid Gemini key to `.env` and restart the server.
+
+================================================================================
+PART 2: ILA_WEB_NEW ENTERPRISE API SPECIFICATION & INTEGRATION GUIDE
+================================================================================
+
+ILA_WEB_NEW is the next-generation modular enterprise application suite for the ILA platform.
+It powers overseas admissions, work-and-study programs, automated candidate ATS, AI-driven
+resume parsing & matching, multichannel communication workflows, department intake CRM, and
+a multi-tier loyalty & rewards engine.
+
+--------------------------------------------------------------------------------
+16. ILA_WEB_NEW SUITE ARCHITECTURE & ROUTING DIRECTORY
+--------------------------------------------------------------------------------
+
+All endpoints are accessible via both the grouped namespace `/api/v1/ila-web-new/...` 
+and dedicated top-level alias endpoints `/api/v1/<subsystem>/...`:
+
+  Subsystem                 Direct Alias Path                  Grouped Path
+  -------------------------------------------------------------------------------------------------
+  1. Accounts & Auth        /api/v1/web-new/auth/              /api/v1/ila-web-new/auth/
+                            /api/v1/web-new/accounts/          /api/v1/ila-web-new/accounts/
+  2. Study Abroad & ATS     /api/v1/study-abroad/              /api/v1/ila-web-new/study-abroad/
+  3. Work & Study Hub       /api/v1/work-study/                /api/v1/ila-web-new/work-study/
+                            /api/v1/work-study-hub/            
+  4. Job Search & Placement /api/v1/jobs/                      /api/v1/ila-web-new/jobs/
+                            /api/v1/job-search/                /api/v1/ila-web-new/job-search/
+  5. Rewards & Loyalty Plan /api/v1/rewards-plan/              /api/v1/ila-web-new/rewards/
+                                                               /api/v1/ila-web-new/rewards-plan/
+  6. Communication Engine   /api/v1/communication/             /api/v1/ila-web-new/communication/
+                            /api/v1/communication-engine/      /api/v1/ila-web-new/communication-engine/
+  7. Intake Tracking CRM    /api/v1/intake/                    /api/v1/ila-web-new/intake/
+                            /api/v1/intake-tracking/           /api/v1/ila-web-new/intake-tracking/
+
+Global Header Format:
+  Content-Type: application/json
+  Authorization: Bearer <JWT_ACCESS_TOKEN>  (for authenticated endpoints)
+
+
+--------------------------------------------------------------------------------
+17. ACCOUNTS & AUTHENTICATION MODULE (Applications.ILA_WEB_NEW.accounts)
+--------------------------------------------------------------------------------
+
+Role Enums:
+  - STUDENT: Prospective or enrolled student
+  - CONSULTANT: Educational/Immigration consultant with ATS permissions
+  - ADMIN: Platform administrator
+  - PARTNER: University or corporate hiring partner
+  - CANDIDATE: Job or Work & Study applicant
+
+17.1. User Registration
+  Endpoint: POST /api/v1/web-new/auth/register/ (or /api/v1/ila-web-new/auth/register/)
+  Auth: Public
+  Request:
+  {
+    "username": "student_rahul",
+    "email": "rahul.sharma@example.com",
+    "password": "SecurePassword123!",
+    "first_name": "Rahul",
+    "last_name": "Sharma",
+    "phone": "+91 9876543210",
+    "role": "STUDENT",
+    "address": "MG Road, Bengaluru, Karnataka",
+    "bio": "Aspiring Masters candidate in Artificial Intelligence"
+  }
+  Response (HTTP 201):
+  {
+    "message": "User registered successfully",
+    "user": {
+      "id": 15,
+      "username": "student_rahul",
+      "email": "rahul.sharma@example.com",
+      "first_name": "Rahul",
+      "last_name": "Sharma",
+      "profile": {
+        "role": "STUDENT",
+        "phone": "+91 9876543210",
+        "address": "MG Road, Bengaluru, Karnataka",
+        "bio": "Aspiring Masters candidate in Artificial Intelligence"
+      }
+    },
+    "tokens": {
+      "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+  }
+
+17.2. User Login
+  Endpoint: POST /api/v1/web-new/auth/login/ (or /api/v1/ila-web-new/auth/login/)
+  Auth: Public
+  Request:
+  {
+    "username": "student_rahul",
+    "password": "SecurePassword123!"
+  }
+  Response (HTTP 200):
+  {
+    "message": "Login successful",
+    "user": {
+      "id": 15,
+      "username": "student_rahul",
+      "email": "rahul.sharma@example.com",
+      "role": "STUDENT",
+      "first_name": "Rahul",
+      "last_name": "Sharma"
+    },
+    "tokens": {
+      "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+  }
+
+17.3. Current User Profile
+  Endpoint: GET /api/v1/web-new/auth/me/
+  Auth: Bearer Token
+  Response (HTTP 200):
+  {
+    "id": 15,
+    "username": "student_rahul",
+    "email": "rahul.sharma@example.com",
+    "first_name": "Rahul",
+    "last_name": "Sharma",
+    "profile": {
+      "role": "STUDENT",
+      "phone": "+91 9876543210",
+      "address": "MG Road, Bengaluru, Karnataka",
+      "bio": "Aspiring Masters candidate in Artificial Intelligence"
+    }
+  }
+
+17.4. Change Password
+  Endpoint: POST /api/v1/web-new/auth/change-password/
+  Auth: Bearer Token
+  Request:
+  {
+    "old_password": "SecurePassword123!",
+    "new_password": "NewSecurePassword456!"
+  }
+  Response (HTTP 200):
+  {
+    "message": "Password changed successfully"
+  }
+
+17.5. Create Staff User
+  Endpoint: POST /api/v1/web-new/auth/create-staff/
+  Auth: Bearer Token (Superuser / Admin only)
+  Request:
+  {
+    "username": "consultant_smith",
+    "email": "smith@ilaglobal.com",
+    "password": "StaffPassword789!",
+    "first_name": "John",
+    "last_name": "Smith",
+    "role": "CONSULTANT"
+  }
+  Response (HTTP 201):
+  {
+    "message": "Staff user created successfully",
+    "user_id": 16
+  }
+
+
+--------------------------------------------------------------------------------
+18. STUDY ABROAD & ADMISSIONS ATS (Applications.ILA_WEB_NEW.study_abroad)
+--------------------------------------------------------------------------------
+
+18.1. Countries Directory
+  Endpoint: GET /api/v1/study-abroad/countries/
+  Query Parameters:
+    - search: string (matches country name or code)
+    - ordering: string (e.g. name, -created_at)
+  Response (HTTP 200):
+  {
+    "count": 6,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 1,
+        "name": "United Kingdom",
+        "code": "GB",
+        "currency": "GBP",
+        "living_cost_approx": "12000.00",
+        "visa_requirements": "CAS letter, UKVI IELTS 6.5 minimum, TB certificate, maintenance funds for 28 consecutive days.",
+        "tie_up_category": "Direct Partner",
+        "colleges": [1, 2],
+        "created_at": "2026-09-11T16:06:55.123456Z"
+      },
+      {
+        "id": 2,
+        "name": "Germany",
+        "code": "DE",
+        "currency": "EUR",
+        "living_cost_approx": "11208.00",
+        "visa_requirements": "Blocked account proof (EUR 11,208/yr), APS certificate for Indian students, health insurance.",
+        "tie_up_category": "Direct Partner"
+      }
+    ]
+  }
+
+18.2. Country Tie-Up Categories
+  Endpoint: GET /api/v1/study-abroad/country-categories/
+  Response (HTTP 200):
+  [
+    { "code": "direct", "name": "Direct University Tie-ups" },
+    { "code": "aggregator", "name": "Global Aggregator Partners" },
+    { "code": "embassy", "name": "Government / Embassy Endorsed" },
+    { "code": "scholarship", "name": "Sponsored Scholarship Programs" }
+  ]
+
+18.3. Partner Colleges / Universities
+  Endpoint: GET /api/v1/study-abroad/colleges/
+  Query Parameters:
+    - country: integer (country ID)
+    - search: string (matches name, city)
+  Endpoint: POST /api/v1/study-abroad/colleges/
+  Request (POST):
+  {
+    "name": "University of Manchester",
+    "country": 1,
+    "city": "Manchester",
+    "world_ranking": 32,
+    "acceptance_rate": 56.5,
+    "website": "https://www.manchester.ac.uk",
+    "description": "Prestigious Russell Group university in the UK."
+  }
+  Response (HTTP 201):
+  {
+    "id": 11,
+    "name": "University of Manchester",
+    "country": 1,
+    "country_name": "United Kingdom",
+    "city": "Manchester",
+    "world_ranking": 32,
+    "acceptance_rate": 56.5,
+    "website": "https://www.manchester.ac.uk",
+    "description": "Prestigious Russell Group university in the UK."
+  }
+
+18.4. Study Abroad Courses
+  Endpoint: GET /api/v1/study-abroad/courses/
+  Query Parameters:
+    - college: integer (college ID)
+    - degree_level: string (BACHELORS, MASTERS, PHD, DIPLOMA)
+    - search: string (matches title, specialization)
+  Response (HTTP 200):
+  {
+    "count": 12,
+    "results": [
+      {
+        "id": 1,
+        "college": 1,
+        "college_name": "University of Oxford",
+        "title": "MSc in Advanced Computer Science",
+        "degree_level": "MASTERS",
+        "duration_months": 12,
+        "tuition_fee": "34500.00",
+        "intake_season": "Fall",
+        "intake_year": 2026,
+        "eligibility_criteria": "First class honours in Computer Science or Mathematics, IELTS 7.5+",
+        "specialization": "Artificial Intelligence & Distributed Systems",
+        "created_at": "2026-09-11T16:06:55.234567Z"
+      }
+    ]
+  }
+
+18.5. Student Applications & ATS Pipeline
+  Endpoint: GET /api/v1/study-abroad/applications/
+  Endpoint: POST /api/v1/study-abroad/applications/
+  Status Workflow:
+    - DRAFT -> SUBMITTED -> UNDER_REVIEW -> OFFER_RECEIVED -> VISA_PROCESSING -> ENROLLED -> REJECTED
+  Request (POST):
+  {
+    "course": 1,
+    "student_name": "Pooja Verma",
+    "student_email": "pooja.v@example.com",
+    "student_phone": "+91 9988776655",
+    "status": "SUBMITTED",
+    "sop_text": "Statement of purpose detailing my interest in Machine Learning...",
+    "notes": "Fast-track scholarship candidate"
+  }
+  Response (HTTP 201):
+  {
+    "id": 8,
+    "course": 1,
+    "course_title": "MSc in Advanced Computer Science",
+    "student_name": "Pooja Verma",
+    "student_email": "pooja.v@example.com",
+    "student_phone": "+91 9988776655",
+    "status": "SUBMITTED",
+    "created_at": "2026-09-11T16:08:12.345678Z"
+  }
+
+18.6. Document Checklists
+  Endpoint: GET /api/v1/study-abroad/checklists/?application=8
+  Endpoint: POST /api/v1/study-abroad/checklists/
+  Request (POST):
+  {
+    "application": 8,
+    "document_name": "Passport Copy (Valid 18+ Months)",
+    "is_mandatory": true,
+    "status": "APPROVED",
+    "remarks": "Verified by admissions officer"
+  }
+
+18.7. Consultant ATS Tasks
+  Endpoint: GET /api/v1/study-abroad/ats-tasks/
+  Query Parameters:
+    - is_completed: boolean (true/false)
+    - priority: string (LOW, MEDIUM, HIGH, URGENT)
+  Endpoint: POST /api/v1/study-abroad/ats-tasks/
+  Request (POST):
+  {
+    "application": 8,
+    "title": "Request CAS Letter from Oxford International Office",
+    "description": "Tuition deposit has been received. Follow up on CAS generation.",
+    "due_date": "2026-09-20T10:00:00Z",
+    "priority": "HIGH"
+  }
+
+18.8. AI Profile Matching Engine
+  Endpoint: POST /api/v1/study-abroad/profile-match/
+  Auth: Public or Bearer Token
+  Description: Evaluates student GPA, test scores, and budget to return scored university matches.
+  Request:
+  {
+    "gpa": 3.8,
+    "ielts": 7.5,
+    "gre": 322,
+    "budget_max": 35000,
+    "preferred_countries": ["United Kingdom", "Germany", "Ireland"],
+    "target_degree": "MASTERS"
+  }
+  Response (HTTP 200):
+  {
+    "status": "success",
+    "candidate_score": 92,
+    "recommended_courses": [
+      {
+        "course_id": 1,
+        "title": "MSc in Advanced Computer Science",
+        "college": "University of Oxford",
+        "country": "United Kingdom",
+        "match_percentage": 94,
+        "fit_category": "Target / Ambitious",
+        "tuition_fee": 34500.0,
+        "rationale": "High GPA (3.8) meets Oxford academic cutoffs; strong IELTS 7.5 exceeds minimum requirement."
+      },
+      {
+        "course_id": 4,
+        "title": "MSc Informatics",
+        "college": "Technical University of Munich",
+        "country": "Germany",
+        "match_percentage": 97,
+        "fit_category": "Safe / Match",
+        "tuition_fee": 0.0,
+        "rationale": "Zero tuition fee matches budget; strong STEM academic profile."
+      }
+    ]
+  }
+
+18.9. Intelligent Resume Parser (PDF & DOCX)
+  Endpoint: POST /api/v1/study-abroad/parse-resume/
+  Auth: Public or Bearer Token
+  Content-Type: multipart/form-data
+  Request Body:
+    file: <Binary file (.pdf or .docx)>
+  Response (HTTP 200):
+  {
+    "status": "success",
+    "filename": "Candidate_Resume_2026.pdf",
+    "parsed_data": {
+      "full_name": "Aakash Mehta",
+      "email": "aakash.mehta@example.com",
+      "phone": "+91 9876501234",
+      "extracted_skills": ["Python", "Django", "PostgreSQL", "Machine Learning", "Docker", "AWS"],
+      "years_experience": 3.5,
+      "degree": "B.Tech in Computer Science",
+      "recommended_career_paths": ["Software Engineer", "Data Scientist", "Full Stack Developer"]
+    }
+  }
+
+
+--------------------------------------------------------------------------------
+19. WORK & STUDY HUB (Applications.ILA_WEB_NEW.work_study)
+--------------------------------------------------------------------------------
+
+19.1. Work & Study Packages
+  Endpoint: GET /api/v1/work-study/packages/
+  Endpoint: POST /api/v1/work-study/packages/
+  Response (HTTP 200):
+  {
+    "count": 4,
+    "results": [
+      {
+        "id": 1,
+        "country": "Germany",
+        "title": "German Dual Vocational Ausbildung & Tech Degree",
+        "duration_months": 36,
+        "stipend_monthly": "1150.00",
+        "legal_work_hours_per_week": 20,
+        "language_level_required": "B1 German",
+        "tuition_coverage_percentage": 100,
+        "description": "Full tuition waiver with paid corporate apprentice contract.",
+        "is_active": true
+      },
+      {
+        "id": 2,
+        "country": "Australia",
+        "title": "Australian Hospitality & Business Postgraduate Work-Study",
+        "duration_months": 24,
+        "stipend_monthly": "2400.00",
+        "legal_work_hours_per_week": 24,
+        "language_level_required": "IELTS 6.0",
+        "tuition_coverage_percentage": 50,
+        "is_active": true
+      }
+    ]
+  }
+
+19.2. Work & Study Candidates
+  Endpoint: GET /api/v1/work-study/candidates/
+  Endpoint: POST /api/v1/work-study/candidates/
+  Status Workflow:
+    - APPLIED -> SCREENING -> INTERVIEW_SCHEDULED -> OFFER_ACCEPTED -> VISA_FILED -> DEPLOYED -> REJECTED
+  Request (POST):
+  {
+    "package": 1,
+    "candidate_name": "Karthik Raja",
+    "email": "karthik.raja@example.com",
+    "phone": "+91 9123456780",
+    "education_qualification": "Diploma in Mechanical Engineering",
+    "work_experience_years": 2,
+    "status": "APPLIED"
+  }
+  Response (HTTP 201):
+  {
+    "id": 5,
+    "package": 1,
+    "package_title": "German Dual Vocational Ausbildung & Tech Degree",
+    "candidate_name": "Karthik Raja",
+    "email": "karthik.raja@example.com",
+    "phone": "+91 9123456780",
+    "status": "APPLIED",
+    "created_at": "2026-09-11T16:08:45.123456Z"
+  }
+
+
+--------------------------------------------------------------------------------
+20. JOB SEARCH & PLACEMENT ATS (Applications.ILA_WEB_NEW.job_search)
+--------------------------------------------------------------------------------
+
+20.1. Partner Companies
+  Endpoint: GET /api/v1/jobs/companies/
+  Endpoint: POST /api/v1/jobs/companies/
+  Response (HTTP 200):
+  {
+    "count": 5,
+    "results": [
+      {
+        "id": 1,
+        "name": "Siemens AG Global Mobility",
+        "industry": "Engineering & Automation",
+        "country": "Germany",
+        "city": "Munich",
+        "website": "https://www.siemens.com",
+        "is_verified": true
+      },
+      {
+        "id": 2,
+        "name": "Barclays Technology Centre",
+        "industry": "FinTech & Banking",
+        "country": "United Kingdom",
+        "city": "London",
+        "website": "https://www.barclays.co.uk",
+        "is_verified": true
+      }
+    ]
+  }
+
+20.2. Job Listings
+  Endpoint: GET /api/v1/jobs/listings/
+  Query Parameters:
+    - company: integer
+    - job_type: string (FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP)
+    - remote: boolean (true/false)
+    - search: string (title, skills)
+  Response (HTTP 200):
+  {
+    "count": 8,
+    "results": [
+      {
+        "id": 1,
+        "company": 1,
+        "company_name": "Siemens AG Global Mobility",
+        "title": "Graduate Automation Software Engineer",
+        "job_type": "FULL_TIME",
+        "location": "Munich, Germany",
+        "salary_min": "55000.00",
+        "salary_max": "68000.00",
+        "currency": "EUR",
+        "required_skills": "Python, C++, PLC, Git, Linux",
+        "is_active": true,
+        "created_at": "2026-09-11T16:06:55.789012Z"
+      }
+    ]
+  }
+
+20.3. Candidate Resumes Repository
+  Endpoint: GET /api/v1/jobs/resumes/
+  Endpoint: POST /api/v1/jobs/resumes/
+  Request (POST):
+  {
+    "full_name": "Arun Kumar",
+    "email": "arun.kumar@example.com",
+    "phone": "+91 9845011223",
+    "current_title": "Backend Python Developer",
+    "skills": "Python, Django, PostgreSQL, Redis, Celery",
+    "years_experience": 3,
+    "expected_salary": "60000.00"
+  }
+
+20.4. Automated Job Matching Engine
+  Endpoint: GET /api/v1/jobs/matches/
+  Endpoint: POST /api/v1/jobs/matches/
+  Request (POST):
+  {
+    "job": 1,
+    "resume": 1,
+    "match_score": 92.5,
+    "ai_feedback": "Strong overlap on Python, Linux, and backend architectural skills."
+  }
+
+
+--------------------------------------------------------------------------------
+21. REWARDS & LOYALTY PLAN (Applications.ILA_WEB_NEW.rewards_plan)
+--------------------------------------------------------------------------------
+
+21.1. Reward Loyalty Plans
+  Endpoint: GET /api/v1/rewards-plan/plans/
+  Endpoint: POST /api/v1/rewards-plan/plans/
+  Response (HTTP 200):
+  {
+    "count": 3,
+    "results": [
+      {
+        "id": 1,
+        "name": "ILA Gold Student Ambassador Plan",
+        "tier": "GOLD",
+        "points_multiplier": 1.5,
+        "referral_bonus_points": 500,
+        "is_active": true
+      },
+      {
+        "id": 2,
+        "name": "ILA Platinum Scholar Rewards",
+        "tier": "PLATINUM",
+        "points_multiplier": 2.0,
+        "referral_bonus_points": 1000,
+        "is_active": true
+      }
+    ]
+  }
+
+21.2. Reward Earning Rules
+  Endpoint: GET /api/v1/rewards-plan/rules/
+  Endpoint: POST /api/v1/rewards-plan/rules/
+  Request (POST):
+  {
+    "plan": 1,
+    "action_type": "REFERRAL_SIGNUP",
+    "points_awarded": 250,
+    "description": "Awarded when referred peer registers and submits application"
+  }
+
+21.3. Reward Catalog Items
+  Endpoint: GET /api/v1/rewards-plan/catalog/
+  Response (HTTP 200):
+  {
+    "count": 6,
+    "results": [
+      {
+        "id": 1,
+        "title": "IELTS / PTE Official Test Fee Reimbursement Voucher",
+        "points_required": 2000,
+        "monetary_value": "15000.00",
+        "stock_available": 50,
+        "is_active": true
+      },
+      {
+        "id": 2,
+        "title": "1-on-1 Visa Mock Interview with Senior UKVI Specialist",
+        "points_required": 750,
+        "monetary_value": "5000.00",
+        "stock_available": 100,
+        "is_active": true
+      }
+    ]
+  }
+
+21.4. Redemptions Processing
+  Endpoint: GET /api/v1/rewards-plan/redemptions/
+  Endpoint: POST /api/v1/rewards-plan/redemptions/
+  Request (POST):
+  {
+    "item": 1,
+    "points_spent": 2000,
+    "notes": "Redeemed for British Council IELTS exam fee waiver."
+  }
+  Response (HTTP 201):
+  {
+    "id": 3,
+    "item": 1,
+    "item_title": "IELTS / PTE Official Test Fee Reimbursement Voucher",
+    "points_spent": 2000,
+    "status": "PENDING_DISPATCH",
+    "created_at": "2026-09-11T16:09:00.123456Z"
+  }
+
+21.5. Broadcast Reward Promotion
+  Endpoint: POST /api/v1/rewards-plan/broadcast-promo/
+  Auth: Staff / Admin only
+  Request:
+  {
+    "title": "Diwali & Fall Intake 2X Points Bonanza!",
+    "message": "Earn double points on all course applications submitted before October 31st.",
+    "target_tier": "ALL",
+    "notification_channels": ["EMAIL", "PUSH"]
+  }
+  Response (HTTP 200):
+  {
+    "status": "dispatched",
+    "recipients_queued": 1420,
+    "promo_code": "BONANZA2X"
+  }
+
+
+--------------------------------------------------------------------------------
+22. COMMUNICATION ENGINE (Applications.ILA_WEB_NEW.communication_engine)
+--------------------------------------------------------------------------------
+
+Supported Channels: EMAIL, SMS, WHATSAPP, WEB_PUSH
+
+22.1. Communication Workflow Rules
+  Endpoint: GET /api/v1/communication/workflows/
+  Endpoint: POST /api/v1/communication/workflows/
+  Request (POST):
+  {
+    "title": "Welcome Email & SOP Guide on Signup",
+    "channel": "EMAIL",
+    "trigger_event": "STUDENT_SIGNUP",
+    "template_subject": "Welcome to ILA Academy - Your Journey Abroad Starts Here!",
+    "template_body": "Hello {{first_name}}, thank you for joining ILA. Here is your free SOP guide...",
+    "delay_minutes": 0,
+    "is_active": true
+  }
+  Response (HTTP 201):
+  {
+    "id": 5,
+    "title": "Welcome Email & SOP Guide on Signup",
+    "channel": "EMAIL",
+    "trigger_event": "STUDENT_SIGNUP",
+    "is_active": true
+  }
+
+22.2. Multichannel Dispatch Logs & Audit
+  Endpoint: GET /api/v1/communication/logs/
+  Query Parameters:
+    - channel: string (EMAIL, SMS, WHATSAPP, WEB_PUSH)
+    - status: string (QUEUED, SENT, DELIVERED, FAILED)
+    - search: string (matches recipient address, title)
+  Response (HTTP 200):
+  {
+    "count": 15,
+    "results": [
+      {
+        "id": 1,
+        "workflow": 1,
+        "channel": "WHATSAPP",
+        "recipient": "+919876543210",
+        "status": "DELIVERED",
+        "error_message": null,
+        "sent_at": "2026-09-11T16:06:56.123456Z"
+      }
+    ]
+  }
+
+
+--------------------------------------------------------------------------------
+23. DEPARTMENT INTAKE CRM & LEADS (Applications.ILA_WEB_NEW.intake_tracking)
+--------------------------------------------------------------------------------
+
+Departments Supported:
+  - OVERSEAS_EDUCATION
+  - WORK_AND_STUDY
+  - RECRUITMENT_HR
+  - GLOBAL_REAL_ESTATE
+  - TOURISM_TRAVEL
+  - CORPORATE_TRAINING
+
+23.1. Department Inquiries (Unified CRM Leads)
+  Endpoint: GET /api/v1/intake/inquiries/
+  Query Parameters:
+    - department: string
+    - priority: string (LOW, MEDIUM, HIGH, URGENT)
+    - status: string (NEW, CONTACTED, IN_PROGRESS, CONVERTED, CLOSED)
+  Endpoint: POST /api/v1/intake/inquiries/
+  Request (POST):
+  {
+    "full_name": "Deepika Sundaram",
+    "email": "deepika.s@example.com",
+    "phone": "+91 9789012345",
+    "department": "OVERSEAS_EDUCATION",
+    "preferred_country": "Germany",
+    "priority": "HIGH",
+    "budget": "1500000.00",
+    "campaign_utm": "google_search_germany_study",
+    "message": "Interested in German Masters courses with scholarship opportunities."
+  }
+  Response (HTTP 201):
+  {
+    "id": 12,
+    "full_name": "Deepika Sundaram",
+    "email": "deepika.s@example.com",
+    "phone": "+91 9789012345",
+    "department": "OVERSEAS_EDUCATION",
+    "priority": "HIGH",
+    "status": "NEW",
+    "created_at": "2026-09-11T16:09:30.123456Z"
+  }
+
+23.2. Follow-Up Auto-Trigger Rules
+  Endpoint: GET /api/v1/intake/triggers/
+  Endpoint: POST /api/v1/intake/triggers/
+  Request (POST):
+  {
+    "department": "OVERSEAS_EDUCATION",
+    "lead_status": "NEW",
+    "idle_hours_before_trigger": 2,
+    "action_to_take": "ESCALATE_TO_SENIOR_CONSULTANT",
+    "is_active": true
+  }
+
+23.3. Social Media & Ad Campaigns Tracking
+  Endpoint: GET /api/v1/intake/campaigns/
+  Endpoint: POST /api/v1/intake/campaigns/
+  Response (HTTP 200):
+  {
+    "count": 4,
+    "results": [
+      {
+        "id": 1,
+        "name": "Fall 2026 European Intake Meta Ads",
+        "platform": "INSTAGRAM",
+        "utm_campaign": "fall_2026_ig",
+        "budget_allocated": "50000.00",
+        "total_leads_generated": 184,
+        "is_active": true
+      }
+    ]
+  }
+
+
+--------------------------------------------------------------------------------
+24. PRODUCTION SETUP & INITIAL SEED RUNBOOK
+--------------------------------------------------------------------------------
+
+To seed and re-initialize the entire ILA_WEB_NEW ecosystem with partner colleges,
+study abroad countries, job listings, rewards, and intake CRM records:
+
+  # 1. Activate virtual environment
+  venv\Scripts\activate
+
+  # 2. Run database migrations
+  python manage.py migrate
+
+  # 3. Seed demonstration & production baseline data
+  python manage.py seed_ila_web_new
+
+Output will verify all 7 subsystems initialized cleanly:
+  [OK] Seeded 6 Study Abroad Countries
+  [OK] Seeded 10 Partner Colleges
+  [OK] Seeded Study Abroad Courses
+  [OK] Seeded Document Checklists
+  [OK] Seeded Consultant ATS Pipeline Tasks
+  [OK] Seeded Work & Study Packages, Roles and Streams
+  [OK] Seeded Work & Study Candidates
+  [OK] Seeded 5 Partner Companies
+  [OK] Seeded Job Listings
+  [OK] Seeded Candidate Resumes and Job Matches
+  [OK] Seeded Reward Plans, Rules and Catalog Items
+  [OK] Seeded Communication Engine Workflow Rules and Dispatch Logs
+  [OK] Seeded Department Intake CRM and Social Campaigns
+
+
+--------------------------------------------------------------------------------
+25. FRONTEND INTEGRATION GUIDE (AXIOS & REACT)
+--------------------------------------------------------------------------------
+
+Frontend API Client Configuration:
+
+  ```javascript
+  import axios from 'axios';
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000/api/v1';
+
+  export const api = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  // Attach JWT Bearer token automatically
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('ila_access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
+  // Example: Run AI Profile Matching
+  export const matchStudyAbroadProfile = async (profileData) => {
+    const response = await api.post('/study-abroad/profile-match/', profileData);
+    return response.data;
+  };
+
+  // Example: Upload and Parse Resume
+  export const uploadResume = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/study-abroad/parse-resume/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  };
+
+  // Example: Submit Lead Inquiry to CRM
+  export const submitDepartmentInquiry = async (leadData) => {
+    const response = await api.post('/intake/inquiries/', leadData);
+    return response.data;
+  };
+  ```
+
+================================================================================
+END OF ILA ENTERPRISE PLATFORM (ILA_WEB & ILA_WEB_NEW) FULL API SPECIFICATION
+================================================================================

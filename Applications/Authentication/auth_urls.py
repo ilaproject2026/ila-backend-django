@@ -21,11 +21,10 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('token/refresh/', RefreshTokenView.as_view(), name='token-refresh'),
-    path('refresh/', RefreshTokenView.as_view(), name='token-refresh-alias'),
     path('check-login/', CheckLoginView.as_view(), name='check-login'),
     path('me/', UserProfileView.as_view(), name='user-profile'),
     path('verify-security-gate/', SecurityGateVerifyView.as_view(), name='verify-security-gate'),
     path('franchise/', FranchisePartnerListCreateView.as_view(), name='franchise-list-create'),
     path('franchise/create/', FranchisePartnerListCreateView.as_view(), name='franchise-create'),
     path('audit-logs/', AuditLogListView.as_view(), name='audit-logs-list'),
-]
+]

@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 from decouple import config as dtconfig
+import dj_database_url
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -48,6 +49,13 @@ INSTALLED_APPS = [
     'django_filters',
     'Applications',
     'Applications.ILA_WEB',
+    'Applications.ILA_WEB_NEW.accounts',
+    'Applications.ILA_WEB_NEW.communication_engine',
+    'Applications.ILA_WEB_NEW.intake_tracking',
+    'Applications.ILA_WEB_NEW.job_search',
+    'Applications.ILA_WEB_NEW.rewards_plan',
+    'Applications.ILA_WEB_NEW.study_abroad',
+    'Applications.ILA_WEB_NEW.work_study',
     'Applications.BusinessStudio',
     'Applications.ImportExport',
     'Applications.GlobalRealEstate',
@@ -89,6 +97,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -99,6 +108,14 @@ DATABASES = {
     }
 }
 
+
+# DATABASES = {
+#     "default": dj_database_url.parse(
+#         dtconfig("DATABASE_URL"),
+#         conn_max_age=600,
+#         ssl_require=True,
+#     )
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -160,6 +177,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'https://ilaglobal.edu',
+    'https://ila-acc-web-new.vercel.app',
 ]
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -185,6 +203,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5176',
     'http://127.0.0.1:5176',
     'https://ilaglobal.edu',
+    'https://ila-acc-web-new.vercel.app',
 ]
 
 
@@ -217,6 +236,18 @@ CELERY_TASK_SERIALIZER = 'json'
 
 # Biometric & Security Gate Master Override PIN
 BIOMETRIC_SECURITY_PIN = dtconfig('BIOMETRIC_SECURITY_PIN', default='7890')
+
+# In-Memory High-Performance Cache Backend (for rate limits, tokens & lookups)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'ila-primary-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+        }
+    }
+}
 
 
 

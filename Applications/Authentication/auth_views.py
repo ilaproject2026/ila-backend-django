@@ -9,6 +9,7 @@ from django.utils.decorators import method_decorator
 from django_smart_ratelimit import rate_limit
 from .auth_models import User
 from .auth_serializers import (
+    LoginSerializer,
     UserRegistrationSerializer,
     ResentOTPSerializer,
     EmailOTPVerifySerializer,
@@ -28,14 +29,17 @@ class RegisterView(APIView):
     serializer_class = UserRegistrationSerializer
 
     def post(self, request):
-       serializer = self.serializer_class(data=request.data)
-       if serializer.is_valid():
-           serializer.save()
-           return Response({"message": "One time password sent to your email/phone for verification"}, status=status.HTTP_201_CREATED)
-       return Response({
-           'message': 'Registration failed',
-           'errors': serializer.errors
-         }, status=status.HTTP_400_BAD_REQUEST)
+        payload = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if not payload.get('identifier'):
+            payload['identifier'] = payload.get('email') or payload.get('phone')
+        serializer = self.serializer_class(data=payload)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "One time password sent to your email/phone for verification"}, status=status.HTTP_201_CREATED)
+        return Response({
+            'message': 'Registration failed',
+            'errors': serializer.errors
+          }, status=status.HTTP_400_BAD_REQUEST)
 
 @method_decorator(rate_limit(key='ip', rate='2/m', block=True), name='post')
 class ResendOTPView(APIView):
@@ -43,14 +47,17 @@ class ResendOTPView(APIView):
     serializer_class = ResentOTPSerializer
 
     def post(self, request):
-       serializer = self.serializer_class(data=request.data, context={'request': request})
-       if serializer.is_valid():
-           serializer.save()
-           return Response({"message": "One time password sent to your email/phone for verification"}, status=status.HTTP_201_CREATED)
-       return Response({
-           'message': 'Registration failed',
-           'errors': serializer.errors
-         }, status=status.HTTP_400_BAD_REQUEST)
+        payload = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if not payload.get('identifier'):
+            payload['identifier'] = payload.get('email') or payload.get('phone')
+        serializer = self.serializer_class(data=payload, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "One time password sent to your email/phone for verification"}, status=status.HTTP_201_CREATED)
+        return Response({
+            'message': 'Registration failed',
+            'errors': serializer.errors
+          }, status=status.HTTP_400_BAD_REQUEST)
    
    
 class VerifyOTPView(APIView):
@@ -58,7 +65,10 @@ class VerifyOTPView(APIView):
     serializer_class = EmailOTPVerifySerializer
 
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        payload = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if not payload.get('identifier'):
+            payload['identifier'] = payload.get('email') or payload.get('phone')
+        serializer = self.serializer_class(data=payload)
         if serializer.is_valid():
             user = serializer.save()  # capture the created user here
             refresh = RefreshToken.for_user(user)
@@ -95,34 +105,42 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        identifier = request.data.get("identifier")
-        password = request.data.get("password")
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            detail_msg = "Invalid credentials. Please verify your password."
+            errors = serializer.errors
+            if isinstance(errors, dict) and 'detail' in errors:
+                d = errors['detail']
+                detail_msg = d[0] if isinstance(d, list) and d else str(d)
+            elif isinstance(errors, dict):
+                first_key = next(iter(errors))
+                val = errors[first_key]
+                detail_msg = val[0] if isinstance(val, list) and val else str(val)
+            elif isinstance(errors, list) and errors:
+                detail_msg = str(errors[0])
 
+            return Response({"detail": detail_msg}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if not identifier or not password:
-            return Response(
-                {"message": "Identifier and password are required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        user = User.objects.filter(
-            Q(username=identifier) | Q(email=identifier) | Q(phone=identifier)
-        ).first()
-
-        if not user or not user.check_password(password):
-            return Response(
-                {"message": "Invalid credentials"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Generate JWT tokens
+        user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)
 
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "fullname": getattr(user, 'full_name', None) or user.fullname or user.get_full_name() or user.username,
+            "role": user.role,
+            "department": user.department or ("Super Admin" if user.is_superuser else "General"),
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+            "is_email_verified": getattr(user, 'is_email_verified', True),
+        }
+
         response = Response({
-            "message": "Login successful",
             "access": str(refresh.access_token),
             "refresh": str(refresh),
-            "user": UserSerializer(user).data
+            "user": user_data,
+            "message": "Login successful"
         }, status=status.HTTP_200_OK)
 
         # Set cookies
@@ -231,7 +249,7 @@ class FranchisePartnerListCreateView(APIView):
     def get(self, request):
         from .auth_models import FranchisePartner
         from .auth_serializers import FranchisePartnerSerializer
-        franchises = FranchisePartner.objects.all().order_by('-created_at')
+        franchises = FranchisePartner.objects.select_related('created_by').all().order_by('-created_at')
         return Response(FranchisePartnerSerializer(franchises, many=True).data)
 
     def post(self, request):
@@ -248,6 +266,6 @@ class AuditLogListView(APIView):
     def get(self, request):
         from .auth_models import AuditLog
         from .auth_serializers import AuditLogSerializer
-        logs = AuditLog.objects.all().order_by('-timestamp')[:100]
+        logs = AuditLog.objects.select_related('user').all().order_by('-timestamp')[:100]
         return Response(AuditLogSerializer(logs, many=True).data)
 

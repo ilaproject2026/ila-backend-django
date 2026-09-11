@@ -97,8 +97,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('Front Office', 'Front Office'),
     ]
 
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='student')
-    department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, null=True, blank=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='student', db_index=True)
+    department = models.CharField(max_length=100, choices=DEPARTMENT_CHOICES, null=True, blank=True, db_index=True)
     avatar = models.CharField(max_length=500, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     security_pin_hash = models.CharField(max_length=255, null=True, blank=True)
@@ -131,10 +131,26 @@ class User(AbstractBaseUser, PermissionsMixin):
         return full or self.fullname or self.username or ''
 
     @property
+    def full_name(self):
+        return self.fullname or self.get_full_name()
+
+    @full_name.setter
+    def full_name(self, value):
+        self.fullname = value
+
+    @property
     def created_at(self):
         return self.date_joined
 
     def save(self, *args, **kwargs):
+        staff_roles = [
+            'Super Admin', 'CEO', 'General Manager', 'Academic HOD', 'Study Abroad HOD',
+            'Visa HOD', 'Work & Study HOD', 'Jobs HOD', 'HR Manager', 'Finance Officer',
+            'Marketing Exec', 'Academic Counselor', 'Franchise Partner', 'Tech Admin', 'Partner'
+        ]
+        if self.role in staff_roles or self.is_superuser:
+            self.is_staff = True
+
         if not self.referral_code:
             code = generate_referral_code()
             while User.objects.filter(referral_code=code).exists():
@@ -155,11 +171,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class RegistrationOTP(models.Model):
-    identifier = models.CharField(max_length=255)
+    identifier = models.CharField(max_length=255, db_index=True)
     username = models.CharField(max_length=150, null=True, blank=True)
     referral_code = models.CharField(max_length=50, null=True, blank=True)
     otp = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     
     def __str__(self):
         return f"{self.identifier} - {self.otp}"
@@ -219,10 +235,14 @@ class AuditLog(models.Model):
     action = models.CharField(max_length=255)
     details = models.TextField(null=True, blank=True)
     ip_address = models.CharField(max_length=50, null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['department', '-timestamp']),
+        ]
 
     def __str__(self):
         return f"[{self.category}] {self.action} by {self.user or 'System'} at {self.timestamp}"

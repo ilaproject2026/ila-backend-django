@@ -10,7 +10,10 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from django.db.models import Sum, Count
 from django.db import transaction
-import google.generativeai as genai
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=FutureWarning)
+    import google.generativeai as genai
 
 from .serializers import (
     ConsultantChatRequestSerializer, ConsultantChatResponseSerializer,

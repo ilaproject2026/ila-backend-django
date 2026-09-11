@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 
@@ -123,7 +124,7 @@ class StaffViewSet(viewsets.ModelViewSet):
 
 
 class FranchiseViewSet(viewsets.ModelViewSet):
-    queryset = FranchisePartner.objects.all().order_by('-created_at')
+    queryset = FranchisePartner.objects.select_related('created_by').all().order_by('-created_at')
     serializer_class = FranchisePartnerSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -135,7 +136,7 @@ class FranchiseViewSet(viewsets.ModelViewSet):
 
 
 class InquiryViewSet(viewsets.ModelViewSet):
-    queryset = Inquiry.objects.all().order_by('-created_at')
+    queryset = Inquiry.objects.prefetch_related('follow_ups').all().order_by('-created_at')
     serializer_class = InquirySerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['category', 'payment_status', 'crm_status', 'target_country', 'target_keyword', 'department']
@@ -151,7 +152,7 @@ class InquiryViewSet(viewsets.ModelViewSet):
 
 
 class FollowUpRecordViewSet(viewsets.ModelViewSet):
-    queryset = FollowUpRecord.objects.all().order_by('-created_at')
+    queryset = FollowUpRecord.objects.select_related('inquiry').all().order_by('-created_at')
     serializer_class = FollowUpRecordSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -160,7 +161,7 @@ class FollowUpRecordViewSet(viewsets.ModelViewSet):
 
 
 class PartnerInstitutionViewSet(viewsets.ModelViewSet):
-    queryset = PartnerInstitution.objects.all().order_by('-last_updated')
+    queryset = PartnerInstitution.objects.annotate(outreach_logs_count=Count('outreach_logs')).all().order_by('-last_updated')
     serializer_class = PartnerInstitutionSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -169,7 +170,7 @@ class PartnerInstitutionViewSet(viewsets.ModelViewSet):
 
 
 class TieUpOutreachLogViewSet(viewsets.ModelViewSet):
-    queryset = TieUpOutreachLog.objects.all().order_by('-dispatched_at')
+    queryset = TieUpOutreachLog.objects.select_related('partner', 'dispatched_by').all().order_by('-dispatched_at')
     serializer_class = TieUpOutreachLogSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -187,7 +188,7 @@ class MarketingCampaignViewSet(viewsets.ModelViewSet):
 
 
 class FieldVisitLogViewSet(viewsets.ModelViewSet):
-    queryset = FieldVisitLog.objects.all().order_by('-visit_date')
+    queryset = FieldVisitLog.objects.select_related('logged_by').all().order_by('-visit_date')
     serializer_class = FieldVisitLogSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -204,7 +205,7 @@ class DepartmentMeetingViewSet(viewsets.ModelViewSet):
 
 
 class RewardProfileViewSet(viewsets.ModelViewSet):
-    queryset = RewardProfile.objects.all().order_by('-lifetime_points')
+    queryset = RewardProfile.objects.select_related('user').prefetch_related('transactions').all().order_by('-lifetime_points')
     serializer_class = RewardProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -213,7 +214,7 @@ class RewardProfileViewSet(viewsets.ModelViewSet):
 
 
 class RewardTransactionViewSet(viewsets.ModelViewSet):
-    queryset = RewardTransaction.objects.all().order_by('-timestamp')
+    queryset = RewardTransaction.objects.select_related('profile', 'profile__user').all().order_by('-timestamp')
     serializer_class = RewardTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -240,7 +241,7 @@ class VisaRequirementRuleViewSet(viewsets.ModelViewSet):
 
 
 class SettlementServiceViewSet(viewsets.ModelViewSet):
-    queryset = SettlementServiceRequest.objects.all().order_by('-arrival_date')
+    queryset = SettlementServiceRequest.objects.select_related('assigned_coordinator').all().order_by('-arrival_date')
     serializer_class = SettlementServiceRequestSerializer
     permission_classes = [permissions.AllowAny]  # Public service request intake
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

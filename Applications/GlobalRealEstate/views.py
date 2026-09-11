@@ -72,7 +72,7 @@ def health_check(request):
 # ==============================================================================
 
 class PropertyViewSet(viewsets.ModelViewSet):
-    queryset = Property.objects.all().prefetch_related('rooms')
+    queryset = Property.objects.all().prefetch_related('rooms').order_by('-created_at')
     serializer_class = PropertySerializer
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]

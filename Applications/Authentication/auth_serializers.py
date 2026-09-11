@@ -1,12 +1,82 @@
 import re
 import random
 from rest_framework import serializers
+from django.db.models import Q
 
 from .auth_models import User, RegistrationOTP
 from .auth_emails import send_registration_otp_email
 
 
 # --------------------------------------------- Authentication Serializers -------------------------------------------------------------
+
+class LoginSerializer(serializers.Serializer):
+    identifier = serializers.CharField(required=False, allow_blank=True)
+    username = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True)
+    role = serializers.CharField(required=False, allow_blank=True)
+    portal_role = serializers.CharField(required=False, allow_blank=True)
+    department = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        lookup = (
+            attrs.get('identifier')
+            or attrs.get('username')
+            or attrs.get('email')
+        )
+        password = attrs.get('password')
+        requested_role = attrs.get('role') or attrs.get('portal_role')
+        requested_dept = attrs.get('department')
+
+        if not lookup or not password:
+            raise serializers.ValidationError({"detail": "Username/email and password are required."})
+
+        # Match either username, email, or phone (case-insensitive where applicable)
+        user_obj = User.objects.filter(
+            Q(username__iexact=lookup) | 
+            Q(email__iexact=lookup) |
+            Q(phone__iexact=lookup)
+        ).first()
+
+        if not user_obj:
+            raise serializers.ValidationError({"detail": "No active account found with the given credentials."})
+
+        # Authenticate password
+        if not user_obj.check_password(password):
+            raise serializers.ValidationError({"detail": "Invalid credentials. Please verify your password."})
+
+        if not user_obj.is_active:
+            raise serializers.ValidationError({"detail": "This user account has been deactivated."})
+
+        # Role & Department Verification
+        if requested_role:
+            req_role_lower = str(requested_role).strip().lower()
+            user_role_lower = str(user_obj.role or '').strip().lower()
+
+            # If user selected student portal, prevent staff unless explicitly testing student view
+            if req_role_lower in ['student'] and user_role_lower not in ['student'] and not user_obj.is_staff and not user_obj.is_superuser:
+                raise serializers.ValidationError({"detail": "Account role mismatch. Please select the appropriate portal."})
+
+            # If user selected staff/team portal, ensure the user has staff privileges
+            if req_role_lower not in ['student', 'employer', 'candidate']:
+                if user_role_lower in ['student'] and not user_obj.is_staff and not user_obj.is_superuser:
+                    raise serializers.ValidationError({"detail": "Access denied: Account does not have staff or operational privileges."})
+
+            # Specific role mismatch check if exact role is strictly specified (non-super-admin)
+            if not user_obj.is_superuser and user_role_lower not in ['super admin', 'ceo']:
+                if req_role_lower not in ['staff', 'team', 'employee'] and req_role_lower != user_role_lower:
+                    raise serializers.ValidationError({"detail": "Access denied: Account role does not match the requested portal role."})
+
+        # Department verification (Super Admin & CEO have global bypass)
+        if requested_dept and not user_obj.is_superuser:
+            user_role_lower = str(user_obj.role or '').strip().lower()
+            if user_role_lower not in ['super admin', 'ceo']:
+                if user_obj.department and str(requested_dept).strip().lower() != str(user_obj.department).strip().lower():
+                    raise serializers.ValidationError({"detail": "Access denied: User is not authorized for the requested department."})
+
+        attrs['user'] = user_obj
+        return attrs
+
 
 class UserRegistrationSerializer(serializers.Serializer):
     identifier = serializers.CharField(required=True)
@@ -230,6 +300,8 @@ class EmailOTPVerifySerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    fullname = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -241,6 +313,8 @@ class UserSerializer(serializers.ModelSerializer):
             "fullname",
             "role",
             "department",
+            "is_staff",
+            "is_superuser",
             "avatar",
             "is_verified",
             "referral_code",
@@ -256,6 +330,9 @@ class UserSerializer(serializers.ModelSerializer):
             "referred_by",
             "date_joined",
         ]
+
+    def get_fullname(self, obj):
+        return getattr(obj, 'full_name', None) or getattr(obj, 'fullname', None) or obj.get_full_name() or obj.username or ''
 
 
 class FranchisePartnerSerializer(serializers.ModelSerializer):

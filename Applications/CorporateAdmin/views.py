@@ -602,11 +602,16 @@ class FinanceSummaryView(APIView):
             total=models.Sum('amount')
         )['total'] or Decimal('0.00')
 
+        dept_spent_map = {
+            row['department']: row['total'] or Decimal('0.00')
+            for row in Expense.objects.filter(organization=org, status=ExpenseStatus.PAID)
+            .values('department')
+            .annotate(total=models.Sum('amount'))
+        }
+
         dept_summaries = []
         for d in departments:
-            spent = Expense.objects.filter(department=d, status=ExpenseStatus.PAID).aggregate(
-                total=models.Sum('amount')
-            )['total'] or Decimal('0.00')
+            spent = dept_spent_map.get(d.id, Decimal('0.00'))
             dept_summaries.append({
                 "department_id": str(d.id),
                 "department_name": d.name,
@@ -707,29 +712,40 @@ class AnalyticsDashboardView(APIView):
             organization=org
         ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
 
-        # Tasks by status
+        # Tasks by status (single aggregation query)
+        task_counts = Task.objects.filter(organization=org).aggregate(
+            pending=models.Count('id', filter=models.Q(status=TaskStatus.PENDING)),
+            in_progress=models.Count('id', filter=models.Q(status=TaskStatus.IN_PROGRESS)),
+            completed=models.Count('id', filter=models.Q(status=TaskStatus.COMPLETED)),
+            overdue=models.Count('id', filter=models.Q(status=TaskStatus.OVERDUE))
+        )
         tasks_by_status = {
-            "pending": Task.objects.filter(organization=org, status=TaskStatus.PENDING).count(),
-            "in_progress": Task.objects.filter(organization=org, status=TaskStatus.IN_PROGRESS).count(),
-            "completed": Task.objects.filter(organization=org, status=TaskStatus.COMPLETED).count(),
-            "overdue": Task.objects.filter(organization=org, status=TaskStatus.OVERDUE).count()
+            "pending": task_counts['pending'] or 0,
+            "in_progress": task_counts['in_progress'] or 0,
+            "completed": task_counts['completed'] or 0,
+            "overdue": task_counts['overdue'] or 0
         }
 
-        # Leads pipeline breakdown
+        # Leads pipeline breakdown (single grouped query)
+        opp_stage_map = {
+            row['stage']: (row['count'], row['total'] or Decimal('0.00'))
+            for row in Opportunity.objects.filter(organization=org)
+            .values('stage')
+            .annotate(count=models.Count('id'), total=models.Sum('value'))
+        }
         leads_pipeline = []
         for stage_code, stage_label in OpportunityStage.choices:
-            opps = Opportunity.objects.filter(organization=org, stage=stage_code)
-            stage_val = opps.aggregate(total=models.Sum('value'))['total'] or Decimal('0.00')
+            cnt, stage_val = opp_stage_map.get(stage_code, (0, Decimal('0.00')))
             leads_pipeline.append({
                 "stage": stage_code,
                 "label": stage_label,
-                "count": opps.count(),
+                "count": cnt,
                 "value": float(stage_val)
             })
 
         # Recent activities (from AuditLog + Notifications)
         recent_activities = []
-        logs = AuditLog.objects.filter(organization=org).order_by('-created_at')[:10]
+        logs = AuditLog.objects.filter(organization=org).select_related('user').order_by('-created_at')[:10]
         for log in logs:
             recent_activities.append({
                 "id": str(log.id),
@@ -781,7 +797,7 @@ class AnalyticsActivityStreamView(APIView):
 
     def get(self, request):
         org = get_current_organization(request)
-        logs = AuditLog.objects.filter(organization=org).order_by('-created_at')[:50]
+        logs = AuditLog.objects.filter(organization=org).select_related('user').order_by('-created_at')[:50]
         stream = [
             {
                 "id": str(l.id),
