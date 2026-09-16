@@ -1,0 +1,866 @@
+================================================================================
+ILA AI ENGINE HUB & COURSE CREATOR — DRF BACKEND API DOCUMENTATION
+Document: AIEnginHub_api_docs.txt
+Target Frontend: React 18+ (TypeScript / Vite / Axios / Tailwind / Lucide)
+Backend Base URL: http://localhost:8000/api/v1/ (Also accessible at /api/)
+Generated: 2026-09-16
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. GLOBAL HTTP CLIENT & FRONTEND INTEGRATION SETUP
+2. SECTION 1: COURSE CREATOR STUDIO & CURRICULUM LIBRARY
+3. SECTION 2: PERMANENT LOCKED COURSE STORE
+4. SECTION 3: COURSE CATEGORIES
+5. SECTION 4: UNIVERSAL AI CHAT & MULTI-TURN SESSIONS
+6. SECTION 5: SPECIALIZED AI HUB (17 AI PRODUCTS & GEMINI GATEWAY)
+7. SECTION 6: UNIVERSITY TIE-UP & ACADEMIC PARTNERSHIP CRM
+8. SECTION 7: EMAIL OUTREACH & ANTI-SPAM PIPELINE
+9. SECTION 8: REGIONAL LOW-LATENCY TTS AUDIO STREAM PROXY
+10. SECTION 9: SYSTEM HEALTH & DASHBOARD TELEMETRY
+11. SECTION 10: COMPLETE TYPESCRIPT INTEGRATION EXAMPLES
+
+================================================================================
+1. GLOBAL HTTP CLIENT & FRONTEND INTEGRATION SETUP
+================================================================================
+
+All endpoints support both camelCase and snake_case request/response payloads
+ensuring 100% plug-and-play compatibility with React / TypeScript.
+
+Base URLs:
+  Development: http://localhost:8000/api/v1
+  Root Prefix:  http://localhost:8000/api
+
+HTTP Headers:
+  Content-Type: application/json
+  Authorization: Bearer <ACCESS_TOKEN>  (Optional for public endpoints)
+
+--- TypeScript Axios / Fetch Client Setup (`src/services/api/drfClient.ts`) ---
+
+```typescript
+export const API_BASE_URL = import.meta.env.VITE_DRF_API_BASE || 'http://localhost:8000/api/v1';
+
+class DRFClient {
+  private accessToken: string | null = localStorage.getItem('ila_access_token');
+  private refreshToken: string | null = localStorage.getItem('ila_refresh_token');
+
+  public setTokens(access: string, refresh: string) {
+    this.accessToken = access;
+    this.refreshToken = refresh;
+    localStorage.setItem('ila_access_token', access);
+    localStorage.setItem('ila_refresh_token', refresh);
+  }
+
+  public clearTokens() {
+    this.accessToken = null;
+    this.refreshToken = null;
+    localStorage.removeItem('ila_access_token');
+    localStorage.removeItem('ila_refresh_token');
+  }
+
+  public async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {}),
+    };
+
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    const res = await fetch(url, { ...options, headers });
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({}));
+      throw new Error(errorBody.error || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  public get<T>(endpoint: string) {
+    return this.request<T>(endpoint, { method: 'GET' });
+  }
+
+  public post<T>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
+  }
+
+  public put<T>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, { method: 'PUT', body: data ? JSON.stringify(data) : undefined });
+  }
+
+  public patch<T>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined });
+  }
+
+  public delete<T>(endpoint: string, data?: any) {
+    return this.request<T>(endpoint, { method: 'DELETE', body: data ? JSON.stringify(data) : undefined });
+  }
+}
+
+export const drfClient = new DRFClient();
+```
+
+================================================================================
+2. SECTION 1: COURSE CREATOR STUDIO & CURRICULUM LIBRARY
+================================================================================
+
+1. LIST ALL COURSES
+   GET /api/v1/courses/
+   Query Parameters:
+     - `search`: Search across title, subtitle, category, overview, tags
+     - `ordering`: `-updated_at`, `title`, `download_count`
+     - `page`: Page number (default: 10 per page)
+   
+   Response (200 OK):
+   {
+     "count": 1,
+     "next": null,
+     "previous": null,
+     "results": [
+       {
+         "id": "course_germany_study_starter",
+         "title": "Mastering Higher Education in Germany: Complete Blueprint",
+         "subtitle": "From APS & Uni-Assist to Blocked Accounts and Visa Success",
+         "category": "Study Abroad & Language Preparation",
+         "subCategory": "Germany Pathways",
+         "deliveryPath": "online_cohort",
+         "batchSlot": "",
+         "overview": "A comprehensive step-by-step masterclass curriculum...",
+         "totalChapters": 3,
+         "sourceSessionId": null,
+         "tags": ["Germany", "Visa", "Blocked Account", "APS", "Uni-Assist"],
+         "isFavorite": true,
+         "isPermanent": true,
+         "locked": true,
+         "downloadCount": 0,
+         "lastDownloadedAt": null,
+         "studiedBy": "",
+         "targetAudience": "",
+         "adminCourseData": {},
+         "slideAiCourseData": {},
+         "intelliCoachCourseData": {},
+         "authorizedStructure": {},
+         "metadata": {},
+         "chapters": [
+           {
+             "id": "chap_germany_1",
+             "chapterNumber": 1,
+             "title": "APS Certification & Academic Evaluation Protocols",
+             "summary": "Understanding the India APS verification timeline...",
+             "content": "### Chapter 1: The APS Process Explained\n\n...",
+             "isCompleted": true,
+             "subTopics": ["APS Document Checklist", "Notarization Requirements", "Verification Timelines"]
+           }
+         ],
+         "versions": [],
+         "createdAt": "2026-09-16T04:26:10.123456Z",
+         "updatedAt": "2026-09-16T04:26:10.123456Z"
+       }
+     ]
+   }
+
+2. GET SINGLE COURSE BY ID
+   GET /api/v1/courses/{id}/
+   Response (200 OK): Full course object with chapters and version snapshots.
+
+3. CREATE / SAVE COURSE
+   POST /api/v1/courses/
+   Payload:
+   {
+     "id": "course_ai_engineering_2026",
+     "title": "Generative AI & LLM Systems Architecture",
+     "subtitle": "From Transformers to Autonomous Agents",
+     "category": "Computer Science & AI",
+     "subCategory": "Applied AI",
+     "deliveryPath": "1on1_hybrid",
+     "overview": "Mastering state of the art LLM architectures, RAG, and fine-tuning.",
+     "totalChapters": 2,
+     "tags": ["AI", "LLM", "RAG", "Python"],
+     "isFavorite": false,
+     "isPermanent": false,
+     "locked": false,
+     "chapters": [
+       {
+         "chapterNumber": 1,
+         "title": "Neural Architectures & Attention Mechanism",
+         "summary": "Core foundational mathematical models.",
+         "content": "Comprehensive markdown content for Chapter 1...",
+         "isCompleted": false,
+         "subTopics": ["Self-Attention", "Positional Encoding", "Multi-Head Attention"]
+       },
+       {
+         "chapterNumber": 2,
+         "title": "Retrieval-Augmented Generation (RAG) at Scale",
+         "summary": "Vector databases and semantic search.",
+         "content": "Comprehensive markdown content for Chapter 2...",
+         "isCompleted": false,
+         "subTopics": ["Embeddings", "Vector Stores", "Context Reranking"]
+       }
+     ]
+   }
+   Response (201 Created): Created course object with auto-assigned IDs.
+
+4. UPDATE COURSE
+   PUT /api/v1/courses/{id}/
+   PATCH /api/v1/courses/{id}/
+   Payload: Partial or full fields (including updated `chapters` array).
+   Response (200 OK): Updated course object.
+
+5. TOGGLE CHAPTER COMPLETION STATUS
+   POST /api/v1/courses/{id}/toggle-chapter/
+   Payload:
+   {
+     "chapterId": "chap_germany_1"
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "chapterId": "chap_germany_1",
+     "isCompleted": false,
+     "course": { ... }
+   }
+
+6. BATCH IMPORT COURSES
+   POST /api/v1/courses/import/
+   Payload:
+   {
+     "courses": [ { ...course1 }, { ...course2 } ]
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "count": 2
+   }
+
+7. EXPORT COURSE TO WORD (.DOCX)
+   GET  /api/v1/courses/{id}/export-docx/
+   POST /api/v1/courses/{id}/export-docx/
+   Response (200 OK):
+     Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+     Content-Disposition: attachment; filename="CourseTitle_Curriculum.docx"
+
+8. DELETE COURSE
+   DELETE /api/v1/courses/{id}/
+   Response (204 No Content)
+
+9. CLEAR ALL UNLOCKED COURSES
+   DELETE /api/v1/courses/clear-all/
+   Response (200 OK):
+   {
+     "success": true,
+     "deletedCount": 4
+   }
+
+================================================================================
+3. SECTION 2: PERMANENT LOCKED COURSE STORE
+================================================================================
+
+Dedicated repository for tamper-proof, locked institutional courses.
+
+1. GET ALL PERMANENT COURSES
+   GET /api/v1/permanent-courses/
+   Response (200 OK): List of courses where `is_permanent = true`.
+
+2. RECORD COURSE DOWNLOAD
+   POST /api/v1/permanent-courses/{id}/download/
+   Payload: {}
+   Response (200 OK):
+   {
+     "success": true,
+     "downloadCount": 12,
+     "lastDownloadedAt": "2026-09-16T04:30:00.000000Z"
+   }
+
+3. SAFE DELETE PERMANENT COURSE (LOCKED GUARD)
+   DELETE /api/v1/permanent-courses/{id}/
+   Payload (if locked):
+   {
+     "manualConfirm": true
+   }
+   Response (204 No Content or 403 Forbidden if manualConfirm is false)
+
+================================================================================
+4. SECTION 3: COURSE CATEGORIES
+================================================================================
+
+1. GET CATEGORIES
+   GET /api/v1/categories/
+   Response (200 OK):
+   [
+     {
+       "id": "cat_cs_ai",
+       "name": "Computer Science & AI",
+       "department": "School of Technology",
+       "description": "AI, Full-Stack, Machine Learning, Data Engineering",
+       "color": "#3B82F6",
+       "created_at": "...",
+       "updated_at": "..."
+     },
+     {
+       "id": "cat_business",
+       "name": "Business & Management",
+       "department": "School of Business",
+       "description": "Global MBA, Supply Chain, International Trade, FinTech",
+       "color": "#10B981"
+     }
+   ]
+
+2. CREATE CATEGORY
+   POST /api/v1/categories/
+   Payload: { "id": "cat_robotics", "name": "Robotics & Automation", "color": "#F59E0B" }
+
+================================================================================
+5. SECTION 4: UNIVERSAL AI CHAT & MULTI-TURN SESSIONS
+================================================================================
+
+1. GET ALL SESSIONS
+   GET /api/v1/sessions/
+   Query Parameters:
+     - `search`: Search title, product_type, studied_by
+     - `ordering`: `-is_pinned`, `-updated_at`
+   
+   Response (200 OK):
+   {
+     "count": 1,
+     "results": [
+       {
+         "id": "session_study_abroad_germany",
+         "title": "Germany APS & Master Admissions Strategy",
+         "isPinned": true,
+         "productType": "course_creator",
+         "productParams": { "academicYear": 2026, "targetCountry": "Germany" },
+         "coursePlan": { ... },
+         "autonomousPlan": null,
+         "studiedBy": "John Doe",
+         "targetAudience": "Undergraduates",
+         "isPermanent": false,
+         "locked": false,
+         "messages": [
+           {
+             "id": "msg_01",
+             "role": "user",
+             "content": "How do I calculate ECTS credits for German Master applications?",
+             "model": "gemini-2.5-flash",
+             "modelDisplayName": "Google Gemini (gemini-2.5-flash)",
+             "responseTimeMs": 340,
+             "documents": [],
+             "groundingSources": [],
+             "nextModuleInfo": null,
+             "createdAt": "..."
+           }
+         ],
+         "createdAt": "...",
+         "updatedAt": "..."
+       }
+     ]
+   }
+
+2. GET SESSION BY ID
+   GET /api/v1/sessions/{id}/
+   Response (200 OK): Full session with all chronological messages.
+
+3. CREATE SESSION
+   POST /api/v1/sessions/
+   Payload:
+   {
+     "id": "session_custom_001",
+     "title": "HR Mock Interview - Machine Learning Engineer",
+     "productType": "hr_mock_interviewer",
+     "productParams": { "experienceLevel": "Senior", "domain": "NLP" }
+   }
+   Response (201 Created)
+
+4. UPDATE SESSION TITLE
+   POST  /api/v1/sessions/{id}/title/
+   PATCH /api/v1/sessions/{id}/title/
+   Payload:
+   {
+     "title": "Executive AI Leadership Architecture"
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "session": { ... }
+   }
+
+5. TOGGLE SESSION PIN STATUS
+   POST /api/v1/sessions/{id}/pin/
+   Response (200 OK):
+   {
+     "success": true,
+     "isPinned": true,
+     "session": { ... }
+   }
+
+6. APPEND MESSAGE TO SESSION
+   POST /api/v1/sessions/{id}/messages/
+   Payload:
+   {
+     "role": "user",
+     "content": "Draft Module 3 learning objectives.",
+     "model": "gemini-2.5-flash",
+     "responseTimeMs": 420
+   }
+   Response (201 Created):
+   {
+     "id": "msg_auto_generated_id",
+     "session": "session_custom_001",
+     "role": "user",
+     "content": "Draft Module 3 learning objectives.",
+     "model": "gemini-2.5-flash",
+     "createdAt": "..."
+   }
+
+7. CLEAR ALL SESSIONS
+   DELETE /api/v1/sessions/clear-all/
+   Response (200 OK): { "success": true, "deletedCount": 5 }
+
+8. BATCH IMPORT SESSIONS
+   POST /api/v1/sessions/import/
+   Payload: { "sessions": [ { ...session1 }, { ...session2 } ] }
+   Response (200 OK): { "success": true, "count": 2 }
+
+================================================================================
+6. SECTION 5: SPECIALIZED AI HUB (17 AI PRODUCTS & GEMINI GATEWAY)
+================================================================================
+
+Unified Gateway executing Google Gemini 2.5 / Flash / Pro with specialized system prompts.
+
+API Endpoint:
+  POST /api/v1/ai/generate/
+  (Also accessible at: POST /api/v1/ai/execute/)
+
+Product Type Codes & Matrix:
+  ------------------------------------------------------------------------------
+  Product Type Key            Tool Name & Domain
+  ------------------------------------------------------------------------------
+  `course_creator`            Multi-Chapter Academic Curriculum Creator
+  `visa_doc_analyzer`         Visa Document & Compliance Analyzer (Germany/UK/US)
+  `hr_mock_interviewer`       HR & Technical Competency Mock Interviewer
+  `proposal_generator`        B2B University Partnership Proposal & MoU Drafter
+  `news_agenda`               Global Higher Education Policy & Visa Monitor
+  `pricing_calculator`        Tuition & Living Cost Breakdown Calculator
+  `weather_tracker`           Destination Climate & Student Living Guide
+  `sop_builder`               Statement of Purpose (SOP) & Motivation Letter AI
+  `scholarship_finder`        Global Scholarships Matching (DAAD, Erasmus, Merit)
+  `slide_deck_architect`      Executive Academic Slide Deck Structure Generator
+  `video_script_studio`       Masterclass Teleprompter Video Script Studio
+  `intelli_coach`             Interactive Socratic Tutor & Knowledge Checker
+  `tieup_research_ai`         B2B University Lead Profiling & Articulation AI
+  `outreach_composer`         Anti-Spam Partnership Email Outreach Composer
+  `ielts_german_evaluator`    Language Proficiency & CEFR Grading Engine (A1-C1)
+  `job_market_forecaster`     Post-Study Work Visa & Job Market Forecaster
+  `universal_assistant`       ILA Universal Educational Companion
+  ------------------------------------------------------------------------------
+
+Sample Request Payload:
+{
+  "prompt": "Draft an MoU framework for 2+2 Computer Science articulation between Technical University of Munich and ILA Global.",
+  "productType": "proposal_generator",
+  "model": "gemini-2.5-flash",
+  "temperature": 0.7
+}
+
+Sample Response (200 OK):
+{
+  "content": "### MEMORANDUM OF UNDERSTANDING (MoU)\n\n**Between:** ILA Global Education\n**And:** Technical University of Munich (TUM)\n\n#### 1. Purpose & Scope\nThis bilateral agreement establishes a 2+2 articulation pathway...",
+  "model": "gemini-2.5-flash",
+  "model_display_name": "Google Gemini (gemini-2.5-flash)",
+  "response_time_ms": 520,
+  "grounding_sources": []
+}
+
+GET ALL PRESETS:
+  GET /api/v1/presets/
+  Returns all registered presets, descriptions, default models, and system prompts.
+
+================================================================================
+7. SECTION 6: UNIVERSITY TIE-UP & ACADEMIC PARTNERSHIP CRM
+================================================================================
+
+1. GET ALL TIE-UP LEADS
+   GET /api/v1/tieup-leads/
+   Query Parameters:
+     - `is_partner`: `true` or `false`
+     - `country`: e.g. `Germany`, `United Kingdom`
+     - `category`: e.g. `Public University`, `Private University`
+     - `anti_spam_status`: `verified`, `flagged_generic`, `bounced`
+     - `search`: Search institution name, location, contact person, email
+
+   Response (200 OK):
+   {
+     "count": 2,
+     "results": [
+       {
+         "id": "lead_tum_01",
+         "sessionId": null,
+         "name": "Technical University of Munich (TUM)",
+         "category": "Public University",
+         "subCategory": "TU9 Excellence",
+         "country": "Germany",
+         "region": "Bavaria",
+         "locationMain": "Munich, Germany",
+         "locationSub": "",
+         "contactPerson": "Dr. Hans Meyer",
+         "contactTitle": "Head of International Admissions",
+         "contactEmail": "international@tum.de",
+         "contactPhone": "+49 89 289 01",
+         "websiteUrl": "https://www.tum.de",
+         "isPartner": true,
+         "compatibilityScore": 96,
+         "commissionPercent": 15.0,
+         "matchingCriteria": ["Top 50 Global", "No Tuition Fee", "High English Track Availability"],
+         "directSourcePageUrl": "https://www.tum.de/en/studies/international",
+         "studentRequirements": "Minimum 75% in Bachelor, IELTS 6.5, APS Certificate.",
+         "institutionCriteria": "Accredited TU9 University.",
+         "termsOfPartnership": "Standard B2B agency agreement.",
+         "termsSummary": "15% agency commission on enrolled students.",
+         "partnershipTerms": {},
+         "minIeltsScore": 6.5,
+         "germanLevelRequired": "B2 (or English Track)",
+         "tuitionFeeYearly": "€0 (Public)",
+         "tuitionAmountEur": 0.0,
+         "scholarshipAvailable": true,
+         "scholarshipDetails": "DAAD Merit Scholarships available.",
+         "courseList": ["M.Sc. Informatics", "M.Sc. Data Engineering", "M.Sc. Robotics"],
+         "mouDocumentUrl": "https://hub.ilaglobal.edu/docs/tum_mou.pdf",
+         "antiSpamStatus": "verified",
+         "antiSpamNotes": "Direct contact verified.",
+         "createdAt": "2026-09-16T04:26:10Z",
+         "updatedAt": "2026-09-16T04:26:10Z"
+       }
+     ]
+   }
+
+2. CREATE SINGLE TIE-UP LEAD
+   POST /api/v1/tieup-leads/
+   Payload: Full or partial lead fields (camelCase or snake_case).
+   Response (201 Created)
+
+3. BATCH SAVE LEADS
+   POST /api/v1/tieup-leads/batch/
+   Payload:
+   {
+     "leads": [
+       {
+         "name": "London South Bank University",
+         "country": "United Kingdom",
+         "category": "Public University",
+         "locationMain": "London, UK",
+         "contactPerson": "Sarah Jenkins",
+         "contactTitle": "Head of Partnerships",
+         "contactEmail": "partnerships@lsbu.ac.uk",
+         "commissionPercent": 20.0
+       }
+     ]
+   }
+   Response (200 OK): { "success": true, "count": 1 }
+
+4. TOGGLE PARTNER STATUS
+   POST /api/v1/tieup-leads/{id}/partner/
+   Response (200 OK):
+   {
+     "success": true,
+     "isPartner": true,
+     "lead": { ... }
+   }
+
+5. GET GLOBAL TIE-UP POLICY
+   GET /api/v1/tieup-policies/
+   Response (200 OK):
+   {
+     "id": "global_policy",
+     "minCommissionPercent": 15.0,
+     "targetCommissionPercent": 20.0,
+     "partnershipCriteria": "Accredited international universities with English-taught programs.",
+     "studentRequirementsGuidelines": "Minimum 60% in Bachelor, IELTS 6.0 or Duolingo 110+.",
+     "termsExpectations": "Direct student invoicing, 20% commission on first-year tuition.",
+     "preferredPaymentTerms": "Net 30 on student semester enrollment",
+     "updatedAt": "2026-09-16T04:26:10Z"
+   }
+
+6. UPDATE TIE-UP POLICY
+   PUT   /api/v1/tieup-policies/global_policy/
+   PATCH /api/v1/tieup-policies/global_policy/
+   Payload: Updated policy fields.
+
+================================================================================
+8. SECTION 7: EMAIL OUTREACH & ANTI-SPAM PIPELINE
+================================================================================
+
+1. VERIFY SMTP CONNECTION
+   POST /api/v1/outreach/verify-smtp/
+   Payload:
+   {
+     "host": "smtp.gmail.com",
+     "port": 587,
+     "senderEmail": "outreach@ilaglobal.edu",
+     "appPassword": "your-16-character-app-password",
+     "secure": false
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "connected": true,
+     "message": "Successfully verified SMTP connection to smtp.gmail.com:587 as outreach@ilaglobal.edu"
+   }
+   Error Response (400 Bad Request):
+   {
+     "success": false,
+     "connected": false,
+     "error": "Username and Password not accepted.",
+     "errorType": "SMTP_HANDSHAKE_FAILED"
+   }
+
+2. SEND SINGLE EMAIL
+   POST /api/v1/outreach/send-single/
+   (Also accessible at: POST /api/v1/outreach/send-single-smtp/)
+   Payload:
+   {
+     "host": "smtp.gmail.com",
+     "port": 587,
+     "senderEmail": "outreach@ilaglobal.edu",
+     "appPassword": "your-app-password",
+     "recipientEmail": "international@tum.de",
+     "subject": "Academic Partnership Proposal - ILA Global",
+     "content": "Dear Dr. Meyer,\n\nWe would like to propose a bilateral partnership...",
+     "leadId": "lead_tum_01",
+     "institutionName": "Technical University of Munich"
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "logId": "uuid-of-outreach-status-log",
+     "status": "delivered"
+   }
+
+3. DISPATCH BATCH CAMPAIGN (RATE-PACED WITH DELAY)
+   POST /api/v1/outreach/dispatch-batch/
+   (Also accessible at: POST /api/v1/outreach/dispatch-smtp/)
+   Payload:
+   {
+     "host": "smtp.gmail.com",
+     "port": 587,
+     "senderEmail": "outreach@ilaglobal.edu",
+     "appPassword": "your-app-password",
+     "delayMs": 500,
+     "subjectTemplate": "Bilateral Articulation Agreement — {{lead.name}} & ILA Global",
+     "bodyTemplate": "Dear {{lead.name}} Admissions Team,\n\nWe represent 500+ qualified candidates...",
+     "leads": [
+       { "id": "lead_tum_01", "name": "Technical University of Munich", "contactEmail": "international@tum.de" },
+       { "id": "lead_bsbi_02", "name": "BSBI Berlin", "contactEmail": "partnerships@berlinsbi.com" }
+     ]
+   }
+   Response (200 OK):
+   {
+     "success": true,
+     "delivered": 2,
+     "failed": 0,
+     "errors": []
+   }
+
+4. GET OUTREACH LOGS
+   GET /api/v1/outreach-logs/
+   (Also accessible at: GET /api/v1/tieup-outreach-logs/)
+   Query Parameters:
+     - `status`: `delivered`, `opened`, `replied`, `bounced`, `flagged_generic`
+     - `phase`: `outreach`, `followup`, `meeting`
+   
+   Response (200 OK):
+   {
+     "count": 2,
+     "results": [
+       {
+         "id": "7bf31758-a99f-4318-87e2-fb3ff691e86a",
+         "lead": "lead_tum_01",
+         "institutionName": "Technical University of Munich",
+         "recipientEmail": "international@tum.de",
+         "senderEmail": "outreach@ilaglobal.edu",
+         "subject": "Bilateral Articulation Agreement",
+         "status": "delivered",
+         "spamScore": 0,
+         "followupCount": 0,
+         "createdAt": "2026-09-16T04:32:00Z"
+       }
+     ]
+   }
+
+================================================================================
+9. SECTION 8: REGIONAL LOW-LATENCY TTS AUDIO STREAM PROXY
+================================================================================
+
+Synthesizes high-fidelity regional audio with server-side caching (7 days).
+
+Endpoint:
+  GET /api/v1/tts/?q={text}&tl={target_language}
+  (Also accessible at: GET /api/tts/?q=...&tl=...)
+
+Query Parameters:
+  - `q`: Text string to convert to speech (URL encoded)
+  - `tl`: Target ISO language code:
+      `ml` -> Malayalam (Regional Kerala Native)
+      `ta` -> Tamil
+      `hi` -> Hindi
+      `de` -> German (Deutsch)
+      `fr` -> French
+      `ar` -> Arabic
+      `en` -> English (Default)
+
+Response:
+  HTTP 200 OK
+  Content-Type: audio/mpeg
+  Cache-Control: public, max-age=604800
+
+Frontend React Audio Playback Snippet:
+```typescript
+export function playRegionalSpeech(text: string, langCode: string = 'en') {
+  const url = `${API_BASE_URL}/tts/?tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(text)}`;
+  const audio = new Audio(url);
+  audio.play().catch(err => console.error('Audio playback failed:', err));
+}
+```
+
+================================================================================
+10. SECTION 9: SYSTEM HEALTH & DASHBOARD TELEMETRY
+================================================================================
+
+1. SYSTEM HEALTH CHECK
+   GET /api/v1/health/
+   Response (200 OK):
+   {
+     "status": "healthy",
+     "app": "AIEnginHub",
+     "version": "1.0.0",
+     "database": "connected",
+     "geminiEngine": "active",
+     "timestamp": "2026-09-16T04:35:00.000000Z"
+   }
+
+2. CENTRAL DASHBOARD KPI STATS
+   GET /api/v1/dashboard/stats/
+   Response (200 OK):
+   {
+     "totalCourses": 1,
+     "permanentCourses": 1,
+     "totalSessions": 1,
+     "totalLeads": 2,
+     "partnerLeads": 1,
+     "totalOutreachLogs": 2,
+     "deliveredOutreach": 2,
+     "timestamp": "2026-09-16T04:35:00.000000Z"
+   }
+
+================================================================================
+11. SECTION 10: COMPLETE TYPESCRIPT INTEGRATION EXAMPLES
+================================================================================
+
+--- Hook 1: Course Creator & Library Hook (`src/hooks/useCourses.ts`) ---
+
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { drfClient } from '../services/api/drfClient';
+
+export interface Chapter {
+  id?: string;
+  chapterNumber: number;
+  title: string;
+  summary: string;
+  content: string;
+  isCompleted: boolean;
+  subTopics: string[];
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  subtitle?: string;
+  category: string;
+  totalChapters: number;
+  isFavorite: boolean;
+  isPermanent: boolean;
+  locked: boolean;
+  chapters?: Chapter[];
+}
+
+export function useCourses() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const fetchCourses = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await drfClient.get<{ results?: Course[] } | Course[]>('/courses/');
+      const list = Array.isArray(res) ? res : res.results || [];
+      setCourses(list);
+    } catch (err) {
+      console.error('Failed to load courses:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const toggleChapter = async (courseId: string, chapterId: string) => {
+    try {
+      const res = await drfClient.post<{ isCompleted: boolean; course: Course }>(
+        `/courses/${courseId}/toggle-chapter/`,
+        { chapterId }
+      );
+      setCourses(prev => prev.map(c => (c.id === courseId ? res.course : c)));
+      return res;
+    } catch (err) {
+      console.error('Failed to toggle chapter:', err);
+      throw err;
+    }
+  };
+
+  const exportDocx = (courseId: string) => {
+    window.open(`${API_BASE_URL}/courses/${courseId}/export-docx/`, '_blank');
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  return { courses, loading, fetchCourses, toggleChapter, exportDocx };
+}
+```
+
+--- Hook 2: AI Hub 17-Product Execution (`src/hooks/useAIEngine.ts`) ---
+
+```typescript
+import { useState } from 'react';
+import { drfClient } from '../services/api/drfClient';
+
+export function useAIEngine() {
+  const [generating, setGenerating] = useState(false);
+
+  const executeAI = async (
+    prompt: string,
+    productType: string = 'universal_assistant',
+    model: string = 'gemini-2.5-flash'
+  ) => {
+    setGenerating(true);
+    try {
+      const res = await drfClient.post<{
+        content: string;
+        model: string;
+        response_time_ms: number;
+      }>('/ai/generate/', {
+        prompt,
+        productType,
+        model,
+      });
+      return res;
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return { executeAI, generating };
+}
+```
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
